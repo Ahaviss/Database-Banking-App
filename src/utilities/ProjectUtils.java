@@ -1,18 +1,20 @@
 package utilities;
 //Java imports
+import java.io.InputStreamReader;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Base64;
-import java.util.Scanner;
+import java.io.BufferedReader;
+import java.io.IOException;
 public class ProjectUtils {
-    private static final Scanner scanner = new Scanner(System.in);
+    private static final BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
     public static int getValidInt (String prompt) {
         while (true) {
             try {
                 //Prints the given prompt
                 System.out.println(prompt);
-                int input = Integer.parseInt(scanner.nextLine());
+                int input = Integer.parseInt(br.readLine());
                 //Checks if the input is positive
                 if (input < 0) {
                     System.out.println("Invalid input. Please enter a positive integer.");
@@ -23,6 +25,8 @@ public class ProjectUtils {
             //Catch invalid input
             } catch (NumberFormatException e) {
                 System.out.println("Invalid input. Please enter a valid integer.");
+            } catch (IOException e) {
+                System.out.println("Invalid input: " + e.getMessage());
             } catch (Exception e) {
                 System.out.printf("An unexpected error occurred: %s%n", e.getMessage());
             }
@@ -45,7 +49,7 @@ public class ProjectUtils {
             try {
                 //Prints the given prompt
                 System.out.println(prompt);
-                String input = scanner.nextLine();
+                String input = br.readLine();
                 //Checks if the input is empty
                 if (input.isEmpty()) {
                     System.out.println("Invalid input. Please enter a non-empty sentence/word.");
@@ -54,6 +58,8 @@ public class ProjectUtils {
                 //Returns the input
                 return input;
             //Catch invalid input
+            } catch (IOException e) {
+                System.out.println("Invalid input: " + e.getMessage());
             } catch (Exception e) {
                 System.out.printf("An unexpected error occurred: %s%n", e.getMessage());
             }
@@ -64,7 +70,7 @@ public class ProjectUtils {
             try {
                 //Prints the given prompt
                 System.out.println(prompt);
-                double input = Double.parseDouble(scanner.nextLine());
+                double input = Double.parseDouble(br.readLine());
                 //Checks if the input is positive and hasn't overflowed
                 if (input < 0 || Double.isNaN(input) || !Double.isFinite(input)) {
                     System.out.println("Invalid input. Please enter a positive number.");
@@ -76,8 +82,9 @@ public class ProjectUtils {
             //Catch invalid input
             catch (NumberFormatException e) {
                 System.out.println("Invalid input. Please enter a valid number.");
-            }
-            catch (Exception e) {
+            } catch (IOException e) {
+                System.out.println("Invalid input: " + e.getMessage());
+            } catch (Exception e) {
                 System.out.printf("An unexpected error occurred: %s%n", e.getMessage());
             }
         }
@@ -89,7 +96,7 @@ public class ProjectUtils {
                 System.out.println(prompt);
                 //Tells the user the password requirements
                 System.out.println("Password must be 8 characters long and contain at least one uppercase letter,\none lowercase letter and one number");
-                String password = scanner.nextLine();
+                String password = br.readLine();
                 //Checks the password length
                 if (password.length() < 8) {
                     System.out.println("Invalid password. Password must be 8 characters long.");
@@ -123,6 +130,9 @@ public class ProjectUtils {
                 }
             }
             //Catch invalid input
+            catch (IOException e) {
+                System.out.println("Invalid input: " + e.getMessage());
+            }
             catch (Exception e) {
                 System.out.printf("An unexpected error occurred: %s%n", e.getMessage());
             }
@@ -140,6 +150,15 @@ public class ProjectUtils {
             return Base64.getEncoder().encodeToString(encodedHash);
         } catch (NoSuchAlgorithmException e) {
             throw new RuntimeException("Error: Hashing algorithm not found!");
+        }
+    }
+    //To close BufferedReader to save resources
+    public static void closeReader () {
+        try {
+            br.close();
+        }
+        catch (IOException e) {
+            System.out.println("Error closing reader: " + e.getMessage());
         }
     }
     //Generic method to check if an arraylist is empty

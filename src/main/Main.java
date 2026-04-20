@@ -2,6 +2,8 @@ package main;
 //Java imports
 import java.util.ArrayList;
 //Local imports
+import logs.enums.*;
+import logs.manager.LogManager;
 import database.Owner;
 import exceptions.*;
 import save.SaveData;
@@ -15,6 +17,7 @@ public class Main {
     private static Owner owner = new Owner();
     //Current account index
     private static int currentAccount = -1;
+    private static int currentAdmin = -1;
     //Current role
     private static LoginEnums role = LoginEnums.NONE;
     //Account and admin lists
@@ -39,9 +42,11 @@ public class Main {
                 catch (AccountLockedException e) {
                     System.out.println(e.getMessage());
                     int accountIndex = e.traceAccountIndex();
+                    String prevStatus = String.valueOf(accounts.get(accountIndex).getAccountStatus());
                     if (accountIndex != -1) {
                         accounts.get(accountIndex).setAccountStatus(AccountStatus.LOCKED);
                     }
+                    LogManager.addLog(Action.ACCOUNT_AUTO_LOCKED, User.USER, String.format("%d (%s)", accounts.get(accountIndex).getAccountId(), accounts.get(accountIndex).getAccountHolder()), null, prevStatus, String.valueOf(accounts.get(accountIndex).getAccountStatus()));
                     break;
                 }
                 catch (LoginFailedException e) {
@@ -80,6 +85,7 @@ public class Main {
                     break;
                 }
                 //If the admin is logged in successfully
+                currentAdmin = adminIndex;
                 System.out.printf("Welcome back %s!", admins.get(adminIndex).getAdminName());
                 //Role is set
                 role = LoginEnums.ADMIN;
@@ -94,7 +100,7 @@ public class Main {
             }
         }
     }
-    public static void accountPanel () {
+    public static ControlFlow accountPanel () {
         while (true) {
             //Account holder options
             System.out.println("Account Panel");
@@ -130,7 +136,7 @@ public class Main {
                     //Sets user role to none
                     role = LoginEnums.NONE;
                     currentAccount = -1;
-                    return;
+                    return ControlFlow.MAIN_MENU;
                 case "change password":
                     //Call edit method
                     Account newAcc = AccountLogic.editPassword(accounts.get(currentAccount));
@@ -143,9 +149,8 @@ public class Main {
                     break;
                 case "quit program":
                     System.out.println("Terminating program...");
-                    //Terminates the JVM
-                    System.exit(0);
-                    break;
+                    //Send a quit message
+                    return ControlFlow.QUIT;
                 default:
                     //Invalid option
                     System.out.println("Invalid option. Please try again.");
@@ -164,7 +169,7 @@ public class Main {
         if (amountOfAccountToEdit > accounts.size()) {
             System.out.println("Invalid input. Please enter a number less than or equal to the number of accounts.");
             return;
-        } else if (amountOfAccountToEdit == 0) {
+        } else if (amountOfAccountToEdit ==0) {
             System.out.println("No accounts edited.");
             return;
         }
@@ -183,26 +188,30 @@ public class Main {
                 }
                 while (true) {
                     //Account editing options
+                    Admin admin = null;
+                    if (role == LoginEnums.ADMIN) {
+                        admin = admins.get(currentAdmin);
+                    }
                     String whatToEdit = ProjectUtils.getValidString("Edit Holder, Edit Password, Edit Credit Score, Edit Account Status, Quit Editing");
                     switch (whatToEdit.toLowerCase()) {
                         case "edit holder":
                             //Call editAccountHolder method
-                            Account tempAccount = AccountLogic.editAccountHolder(accounts.get(accountIndex));
+                            Account tempAccount = AccountLogic.editAccountHolder(accounts.get(accountIndex), admin);
                             accounts.set(accountIndex, tempAccount);
                             break;
                         case "edit password":
                             //Call editPassword method
-                            Account tempAccount2 = AccountLogic.editPasswordAdmin(accounts.get(accountIndex));
+                            Account tempAccount2 = AccountLogic.editPasswordAdmin(accounts.get(accountIndex), admin);
                             accounts.set(accountIndex, tempAccount2);
                             break;
                         case "edit credit score":
                             //Call editCreditScore method
-                            Account tempAccount3 = AccountLogic.editCreditScore(accounts.get(accountIndex));
+                            Account tempAccount3 = AccountLogic.editCreditScore(accounts.get(accountIndex), admin);
                             accounts.set(accountIndex, tempAccount3);
                             break;
                         case "edit account status":
                             //Call editAccountStatus method
-                            Account tempAccount4 = AccountLogic.editAccountStatus(accounts.get(accountIndex));
+                            Account tempAccount4 = AccountLogic.editAccountStatus(accounts.get(accountIndex), admin);
                             accounts.set(accountIndex, tempAccount4);
                             break;
                         case "quit editing":
@@ -340,12 +349,30 @@ public class Main {
             }
         }
     }
-    public static void ownerPanel () {
-        //Owner panel options
-        boolean quit = true;
-        while (quit) {
+    public static void manageLogs () {
+        while (true) {
             try {
-                String option = ProjectUtils.getValidString("Add Admins, Delete Admins, Edit Admins, Logout, Quit Owner Panel, Killswitch, Edit Owner Account, Quit Program");
+                String option = ProjectUtils.getValidString("Print logs, Clear all logs, Quit managing.");
+                if (option.equalsIgnoreCase("print logs")) {
+                    LogManager.printLogs();
+                } else if (option.equalsIgnoreCase("clear all logs")) {
+                    SaveData.clearLogs();
+                } else if (option.equalsIgnoreCase("quit managing")) {
+                    return;
+                } else {
+                    System.out.println("Invalid option. Please try again.");
+                }
+            }
+            catch (Exception e) {
+                System.out.printf("An unexcepted error occurred: %s%n", e.getMessage());
+            }
+        }
+    }
+    public static ControlFlow ownerPanel () {
+        //Owner panel options
+        while (true) {
+            try {
+                String option = ProjectUtils.getValidString("Add Admins, Delete Admins, Edit Admins, Logout, Quit Owner Panel, Killswitch\nEdit Owner Account, Manage Logs, Quit Program");
                 switch (option.toLowerCase()) {
                     case "add admins":
                         //Calls addAdmin method
@@ -368,16 +395,15 @@ public class Main {
                         System.out.println("Logging out...");
                         //Sets user role to none
                         role = LoginEnums.NONE;
-                        quit = false;
-                        break;
+                        //Send a main menu message
+                        return ControlFlow.MAIN_MENU;
                     case "quit owner panel":
-                        //Returns to the main menu
-                        quit = false;
-                        break;
+                        //Send a back message
+                        return ControlFlow.BACK;
                     case "quit program":
                         System.out.println("Terminating program...");
-                        //Terminates the JVM
-                        System.exit(0);
+                        //Send a quit message
+                        return ControlFlow.QUIT;
                     case "killswitch":
                         //Assigns killswitch to true
                         if (SaveData.killswitch()) {
@@ -390,6 +416,9 @@ public class Main {
                         //Calls editOwner method
                         editOwner();
                         break;
+                    case "manage logs":
+                        //Calls manageLogs method
+                        manageLogs();
                     default:
                         //Invalid option
                         System.out.println("Invalid option. Please try again.");
@@ -404,7 +433,7 @@ public class Main {
             }
         }
     }
-    public static void adminPanel () {
+    public static ControlFlow adminPanel () {
         while (true) {
             //If not admin or owner
             if (role != LoginEnums.ADMIN && role != LoginEnums.OWNER) {
@@ -421,14 +450,18 @@ public class Main {
             else {
                 option = ProjectUtils.getValidString("Add Accounts, Delete Accounts, Edit accounts, Logout, Quit program");
             }
+            Admin admin = null;
+            if (role == LoginEnums.ADMIN) {
+                admin = admins.get(currentAdmin);
+            }
             switch (option.toLowerCase()) {
                 case "add accounts":
                     //Calls addAccount method
-                    accounts = AccountLogic.createAccount(accounts);
+                    accounts = AccountLogic.createAccount(accounts, admin);
                     break;
                 case "delete accounts":
                     //Calls deleteAccount method
-                    ArrayList <Account> tempAccount = AccountLogic.deleteAccounts(accounts);
+                    ArrayList <Account> tempAccount = AccountLogic.deleteAccounts(accounts, admin);
                     if (tempAccount != null) {
                         //Edits the accounts list only if tempAccount is not null
                         accounts = tempAccount;
@@ -443,17 +476,19 @@ public class Main {
                     System.out.println("Logging out...");
                     //Sets user role to none
                     role = LoginEnums.NONE;
-                    return;
+                    currentAdmin = -1;
+                    return ControlFlow.MAIN_MENU;
                 case "quit program":
                     System.out.println("Terminating program...");
-                    //Terminates the JVM
-                    System.exit(0);
-                    break;
+                    //Send a quit message
+                    return ControlFlow.QUIT;
                 default:
                     //Access the owner panel option only if the role is the owner
                     if (option.equalsIgnoreCase("owner panel") && role == LoginEnums.OWNER) {
-                        ownerPanel();
-                        continue;
+                        ControlFlow controlFlow = ownerPanel();
+                        if (controlFlow == ControlFlow.MAIN_MENU) return ControlFlow.MAIN_MENU;
+                        if (controlFlow == ControlFlow.BACK) continue;
+                        if (controlFlow == ControlFlow.QUIT) return ControlFlow.QUIT;
                     }
                     //General admin panel error message
                     System.out.println("Invalid option. Please try again.");
@@ -465,6 +500,7 @@ public class Main {
         accounts = SaveData.loadAccountData();
         admins = SaveData.loadAdminData();
         owner = SaveData.loadOwnerData();
+        LogManager.loadLogs(SaveData.loadAuditData());
     }
     //Main method
     public static void main(String[] args) {
@@ -474,18 +510,21 @@ public class Main {
         Runtime runtime = Runtime.getRuntime();
         runtime.addShutdownHook(new Thread(() -> {
             if (killswitch) return;
-            SaveData.saveData(admins, accounts, owner);
+            SaveData.saveData(admins, accounts, owner, LogManager.getLogs());
+            ProjectUtils.closeReader();
         }));
         while (true) {
             try {
                 //If the role is admin or owner, call the adminPanel method
                 if (role == LoginEnums.ADMIN || role == LoginEnums.OWNER) {
-                    adminPanel();
-                    continue;
+                    ControlFlow controlFlow = adminPanel();
+                    if (controlFlow == ControlFlow.QUIT) return;
+                    else continue;
                 //If the role is user, call the accountPanel method
                 } else if (role == LoginEnums.USER) {
-                    accountPanel();
-                    continue;
+                    ControlFlow controlFlow = accountPanel();
+                    if (controlFlow == ControlFlow.QUIT) return;
+                    else continue;
                 }
                 //If the role is none
                 System.out.println("Welcome to the Banking System!");
@@ -510,8 +549,8 @@ public class Main {
                     accounts.add(account);
                 } else if (answer.equalsIgnoreCase("quit")) {
                     System.out.println("Terminating program...");
-                    //Terminates the JVM
-                    System.exit(0);
+                    //Ends the program
+                    return;
                 } else {
                     //Invalid input
                     System.out.println("Invalid input. Please enter 'login' or 'create'.");

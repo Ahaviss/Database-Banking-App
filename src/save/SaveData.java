@@ -4,6 +4,8 @@ import java.util.ArrayList;
 import database.Account;
 import database.Admin;
 import database.Owner;
+import logs.database.Log;
+import logs.manager.LogManager;
 import utilities.ProjectUtils;
 
 public class SaveData {
@@ -45,11 +47,25 @@ public class SaveData {
             return new Owner();
         }
     }
+    //Loads audit log data
+    @SuppressWarnings("unchecked")
+    public static ArrayList<Log> loadAuditData () {
+        File file = new File("auditMetadata.ser");
+        if (!file.exists()) return new ArrayList<>();
+        try (ObjectInputStream ois = new ObjectInputStream(new FileInputStream(file))) {
+            return (ArrayList<Log>) ois.readObject();
+        }
+        catch (IOException | ClassNotFoundException e) {
+            System.err.println("Error loading data: " + e.getMessage());
+            return new ArrayList<>();
+        }
+    }
     //Saves all data
-    public static void saveData(ArrayList<Admin> admins, ArrayList<Account> accounts, Owner owner) {
+    public static void saveData(ArrayList<Admin> admins, ArrayList<Account> accounts, Owner owner, ArrayList<Log> logs) {
         File file1 = new File("adminMetadata.ser");
         File file2 = new File("ownerMetadata.ser");
         File file3 = new File("accountMetadata.ser");
+        File file4 = new File("auditMetadata.ser");
         try (ObjectOutputStream ous = new ObjectOutputStream(new FileOutputStream(file3))) {
             ous.writeObject(accounts);
         }
@@ -68,7 +84,30 @@ public class SaveData {
         catch (IOException e) {
             System.err.println("Error saving owner data: " + e.getMessage());
         }
+        try (ObjectOutputStream ous = new ObjectOutputStream(new FileOutputStream(file4))) {
+            ous.writeObject(logs);
+        }
+        catch (IOException e) {
+            System.err.println("Error saving data: " + e.getMessage());
+        }
     }
+    //To delete logs file
+    public static void clearLogs () {
+        try {
+            File file = new File ("auditMetadata.ser");
+            if (file.exists()) {
+                boolean del = file.delete();
+                if (!del) {
+                    System.out.println("Error deleting logs.");
+                }
+                LogManager.clearLogs();
+            }
+        }
+        catch (Exception e) {
+            System.err.println("Error clearing logs: " + e.getMessage());
+        }
+    }
+
     //Killswitch for owner
     public static boolean killswitch () {
         while (true) {
@@ -81,6 +120,7 @@ public class SaveData {
                     File delete1 = new File("accountMetadata.ser");
                     File delete2 = new File("adminMetadata.ser");
                     File delete3 = new File("ownerMetadata.ser");
+                    File delete4 = new File("auditMetadata.ser");
                     //Deletes all files
                     if (delete1.exists()) {
                         boolean del = delete1.delete();
@@ -93,6 +133,10 @@ public class SaveData {
                     if (delete3.exists()) {
                         boolean del = delete3.delete();
                         if (!del) System.out.println("Delete failed for owner data.");
+                    }
+                    if (delete4.exists()) {
+                        boolean del = delete4.delete();
+                        if (!del) System.out.println("Delete failed for audit logs data.");
                     }
                     return true;
                 }

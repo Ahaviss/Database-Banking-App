@@ -61,6 +61,8 @@ To change the owner password:
 * Data is now saved with shutdown hooks.
 * Removed hardcoded owner password and username.
 * Added custom exceptions instead of magic numbers.
+* Added audit logs for the owner and is saved using File I/O.
+* Added control flow to avoid System.exit(0).
 ---
 
 *Developed by Ahaviss - 2026*
