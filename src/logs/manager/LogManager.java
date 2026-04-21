@@ -28,7 +28,7 @@ public class LogManager {
         }
         System.out.println("---[AUDIT LOGS START]---");
         for (Log log : logs) {
-            System.out.println(log.pullLog());
+            System.out.println(log);
         }
         System.out.println("---[AUDIT LOGS ENDS]---");
     }

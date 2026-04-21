@@ -35,7 +35,8 @@ public class Log implements Serializable {
         this.before = before;
         this.after = after;
     }
-    public String pullLog () {
+    @Override
+    public String toString () {
         if (destination == null) {
             return String.format ("[AUDIT %s]: %s action | (%s) | %s | %s -> %s", timeStamp.format(formatter), user.getValue(), source, action.getAction(), before, after);
         } else {
