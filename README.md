@@ -64,6 +64,11 @@ To change the owner password:
 * MAJOR: Added audit logs for the owner and is saved using File I/O.
 * Added control flow to avoid System.exit(0).
 * MAJOR: Added time-based account lockouts instead of permanent lockouts
+* MAJOR:
+* a) Moved build tool to Maven.
+* b) Using JSON via Jackson to save data instead of serialization
+* c) Hashing passwords now includes a salt.
+* d) JSON is encrypted with AES-256.
 ---
 
 *Developed by Ahaviss - 2026*
