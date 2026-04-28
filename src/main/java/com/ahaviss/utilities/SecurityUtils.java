@@ -16,7 +16,7 @@ public class SecurityUtils {
     private static final int TAG_LENGTH_BIT = 128;
     private static final int IV_LENGTH_BYTE = 12;
     private static final int SALT_LENGTH_BYTE = 16;
-    private static final int ITERATIONS = 65000;
+    private static final int ITERATIONS = 310000;
     private static final int KEY_LENGTH = 256;
     public static SecretKey getAESKeyFromPassword(char[] password, byte[] salt) throws Exception {
         SecretKeyFactory factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256");

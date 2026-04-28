@@ -38,6 +38,7 @@ public class LoginSystem {
                         Account account = accounts.get(j);
                         LocalDateTime lockedTime = account.getAccountLockedTime();
                         if (lockedTime == null && account.getDurationLocked() == Integer.MAX_VALUE) throw new AccountLockedException(accounts.get(j).getAccountId(), Integer.MAX_VALUE);
+                        else if (lockedTime == null) throw new IllegalStateException("Locked time is in an illegal state. Duration locked is not Integer.MAX_VAUE and locked time is null.");
                         Duration duration = Duration.between(lockedTime, LocalDateTime.now());
                         if (account.getDurationLocked() == Integer.MAX_VALUE) throw new AccountLockedException(accounts.get(j).getAccountId(), Integer.MAX_VALUE);
                         if (duration.toMinutes() >= account.getDurationLocked()) {

@@ -6,10 +6,9 @@ import com.ahaviss.database.Account;
 import com.ahaviss.database.Admin;
 import com.ahaviss.database.Owner;
 import com.ahaviss.logs.database.Log;
-import com.ahaviss.logs.manager.LogManager;
+import com.ahaviss.session.Session;
 import com.ahaviss.utilities.ProjectUtils;
 import com.ahaviss.utilities.SecurityUtils;
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
@@ -20,60 +19,49 @@ public class SaveData {
         mapper.registerModule(new JavaTimeModule());
         mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
     }
-    private static final String ACCOUNTS_FILE = "accounts.ser";
-    private static final String ADMINS_FILE   = "admins.ser";
-    private static final String OWNER_FILE    = "owner.ser";
-    private static final String AUDIT_FILE    = "auditLogs.ser";
+    private static final String ACCOUNTS_FILE = "accounts.enc";
+    private static final String ADMINS_FILE   = "admins.enc";
+    private static final String OWNER_FILE    = "owner.enc";
+    private static final String AUDIT_FILE    = "auditLogs.enc";
     //Loads account data
-    public static ArrayList<Account> loadAccountData (String password) {
+    public static ArrayList<Account> loadAccountData (String password) throws Exception {
         return loadList(ACCOUNTS_FILE, password, Account.class);
     }
     //Loads admin data
-    public static ArrayList<Admin> loadAdminData (String password) {
+    public static ArrayList<Admin> loadAdminData (String password) throws Exception {
         return loadList(ADMINS_FILE, password, Admin.class);
     }
     //Loads owner data
-    public static Owner loadOwnerData (String password) {
-        try {
-            File file = new File(OWNER_FILE);
-            if (!file.exists()) return new Owner();
-            String encrypted = Files.readString(file.toPath());
-            String jsonString = SecurityUtils.decrypt(encrypted, password);
-            Owner owner = mapper.readValue(jsonString, Owner.class);
-            if (owner == null)  return new Owner();
-            return owner;
-        }
-        catch (Exception e) {
-            System.out.println("Error loading data: " + e.getMessage());
-            return new Owner();
-        }
+    public static Owner loadOwnerData (String password) throws Exception {
+        File file = new File(OWNER_FILE);
+        if (!file.exists()) return new Owner();
+        String encrypted = Files.readString(file.toPath());
+        String jsonString = SecurityUtils.decrypt(encrypted, password);
+        Owner owner = mapper.readValue(jsonString, Owner.class);
+        if (owner == null)  return new Owner();
+        return owner;
     }
     //Loads audit log data
-    public static ArrayList<Log> loadAuditData (String password) {
+    public static ArrayList<Log> loadAuditData (String password) throws Exception {
         return loadList(AUDIT_FILE, password, Log.class);
     }
     //Generic method to load data
-    private static <T> ArrayList<T> loadList(String filename, String password, Class type) {
-        try {
-            File file = new File(filename);
-            if (!file.exists()) return new ArrayList<>();
-            String encrypted = Files.readString(file.toPath());
-            String jsonString = SecurityUtils.decrypt(encrypted, password);
-            ArrayList<T> list = mapper.readValue(jsonString, mapper.getTypeFactory().constructCollectionType(ArrayList.class, type));
-            if (list == null) return new ArrayList<>();
-            return list;
-        }
-        catch (Exception e) {
-            System.out.println("Error loading data: " + e.getMessage());
-            return new ArrayList<>();
-        }
+    private static <T> ArrayList<T> loadList(String filename, String password, Class type) throws Exception {
+        File file = new File(filename);
+        if (!file.exists()) return new ArrayList<>();
+        String encrypted = Files.readString(file.toPath());
+        String jsonString = SecurityUtils.decrypt(encrypted, password);
+        ArrayList<T> list = mapper.readValue(jsonString, mapper.getTypeFactory().constructCollectionType(ArrayList.class, type));
+        if (list == null) return new ArrayList<>();
+        return list;
     }
     //Saves all data
-    public static void saveData(ArrayList<Admin> admins, ArrayList<Account> accounts, Owner owner, ArrayList<Log> logs, String password) {
+    public static void saveData(ArrayList<Admin> admins, ArrayList<Account> accounts, Owner owner, ArrayList<Log> logs) {
         File file1 = new File(ADMINS_FILE);
         File file2 = new File(OWNER_FILE);
         File file3 = new File(ACCOUNTS_FILE);
         File file4 = new File(AUDIT_FILE);
+        String password = Session.getMasterPassword();
         try {
             // Step 1: Convert list to JSON string (same as before, just not to file yet)
             String jsonString = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(admins);
@@ -83,7 +71,7 @@ public class SaveData {
             Files.writeString(file1.toPath(), encrypted);
         }
         catch (Exception e) {
-            System.out.println("Error saving admin data: " + e.getMessage());
+            System.out.println("Error saving admin data: " +  e.getMessage());
         }
         try {
             // Step 1: Convert list to JSON string (same as before, just not to file yet)
@@ -128,7 +116,6 @@ public class SaveData {
                 if (!del) {
                     System.out.println("Error deleting logs.");
                 }
-                LogManager.clearLogs();
             }
         }
         catch (Exception e) {
