@@ -22,14 +22,15 @@ public class SaveData {
         mapper.registerModule(new JavaTimeModule());
         mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
     }
-    private static final String ACCOUNTS_FILE = "src\\main\\resources\\accounts.enc";
-    private static final String ADMINS_FILE   = "src\\main\\resources\\admins.enc";
-    private static final String OWNER_FILE    = "src\\main\\resources\\owner.enc";
-    private static final String AUDIT_FILE    = "src\\main\\resources\\auditLogs.enc";
-    private static final String BACKUP_ACCOUNTS_FILE = "src\\main\\backup-resources\\accounts.enc";
-    private static final String BACKUP_ADMINS_FILE   = "src\\main\\backup-resources\\admins.enc";
-    private static final String BACKUP_OWNER_FILE    = "src\\main\\backup-resources\\owner.enc";
-    private static final String BACKUP_AUDIT_FILE    = "src\\main\\backup-resources\\auditLogs.enc";
+    private static final String fileSeparator = java.io.File.separator;
+    private static final String ACCOUNTS_FILE = "src" + fileSeparator + "main" + fileSeparator + "resources" + fileSeparator + "accounts.enc";
+    private static final String ADMINS_FILE   = "src" + fileSeparator + "main" + fileSeparator + "resources" + fileSeparator + "admins.enc";
+    private static final String OWNER_FILE    = "src" + fileSeparator + "main" + fileSeparator + "resources" + fileSeparator + "owner.enc";
+    private static final String AUDIT_FILE    = "src" + fileSeparator + "main" + fileSeparator + "resources" + fileSeparator + "auditLogs.enc";
+    private static final String BACKUP_ACCOUNTS_FILE = "src" + fileSeparator + "main" + fileSeparator + "backup-resources" + fileSeparator + "accounts.enc";
+    private static final String BACKUP_ADMINS_FILE   = "src" + fileSeparator + "main" + fileSeparator + "backup-resources" + fileSeparator + "admins.enc";
+    private static final String BACKUP_OWNER_FILE    = "src" + fileSeparator + "main" + fileSeparator + "backup-resources" + fileSeparator + "owner.enc";
+    private static final String BACKUP_AUDIT_FILE    = "src" + fileSeparator + "main" + fileSeparator + "backup-resources" + fileSeparator + "auditLogs.enc";
     //Loads account data
     public static Map<Integer, Account> loadAccountData (String password) throws Exception {
         if (!new File(ACCOUNTS_FILE).exists() && new File(BACKUP_ACCOUNTS_FILE).exists()) {
