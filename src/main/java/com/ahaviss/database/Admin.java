@@ -3,7 +3,7 @@ package com.ahaviss.database;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonCreator;
 
-public class Admin {
+public class Admin implements Printable{
     //Private fields
     private final int adminId;
     private String adminName;
@@ -22,6 +22,7 @@ public class Admin {
     public void setAdminPassword(String adminPassword) {this.adminPassword = adminPassword;}
     public void setAdminName(String adminName) {this.adminName = adminName;}
     //Prints the admin information
+    @Override
     public void printInfo () {
         System.out.println("Admin ID: " + adminId);
         System.out.println("Admin Name: " + adminName);

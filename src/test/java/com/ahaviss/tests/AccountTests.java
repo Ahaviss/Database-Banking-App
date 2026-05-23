@@ -22,7 +22,7 @@ class AccountTests {
     private Account account;
     @BeforeEach
     void setUp() {
-        account = new Account(5555555, "John", 100, SecurityUtils.hashPassword("123Password", SecurityUtils.generateSalt()), AccountStatus.ACTIVE, 800);
+        account = new Account(5555555, "John", 100, SecurityUtils.hashPassword("123Password"), AccountStatus.ACTIVE, 800);
     }
     @AfterEach
     void tearDown() {
@@ -75,7 +75,7 @@ class AccountTests {
         @ValueSource(ints = {500, 100, 50, 1000})
         @DisplayName("Test Transfers")
         void testTransfers(int transferAmount) {
-            String hashedPassword = SecurityUtils.hashPassword("123Password", SecurityUtils.generateSalt());
+            String hashedPassword = SecurityUtils.hashPassword("123Password");
             Account account2 = new Account(5555556, "John", 100, hashedPassword, AccountStatus.ACTIVE, 800);
             Map<Integer, Account> accounts = new HashMap<>();
             accounts.put(account.getAccountId(), account);
@@ -94,7 +94,7 @@ class AccountTests {
     }
     @Nested
     class AdminInputTests {
-        private static final Admin admin = new Admin(5555555, "ahaviss", SecurityUtils.hashPassword("123Password", SecurityUtils.generateSalt()));
+        private static final Admin admin = new Admin(5555555, "ahaviss", SecurityUtils.hashPassword("123Password"));
         @ParameterizedTest
         @CsvSource({
                 "1, 123Passwordd",
@@ -114,7 +114,7 @@ class AccountTests {
         @DisplayName("Test Deleting Accounts")
         void testDeletingAccounts(int accountId) {
             final Map<Integer, Account> accounts = new HashMap<>();
-            String hashedPassword = SecurityUtils.hashPassword("123Password", SecurityUtils.generateSalt());
+            String hashedPassword = SecurityUtils.hashPassword("123Password");
             accounts.put(accountId, new Account (accountId, "John", 100, hashedPassword, AccountStatus.ACTIVE, 800));
             String simulatedInput = String.format("1\n%s\n", accountId);
             TestUtils.mockInput(simulatedInput);

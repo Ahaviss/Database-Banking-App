@@ -3,7 +3,7 @@ import com.ahaviss.enums.TransferDirection;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
-public class Transfer {
+public class Transfer implements Printable {
     //Private fields
     private final double amountTransferred;
     private final int targetAccountId;
@@ -18,6 +18,7 @@ public class Transfer {
         this.direction = direction;
     }
     //Prints the transfer information
+    @Override
     public void printInfo () {
         System.out.printf("Target Account ID: %d%nSource Account ID: %d%nAmount Transferred: %.2f%n%s%n", targetAccountId, sourceAccountId, amountTransferred, direction);
     }

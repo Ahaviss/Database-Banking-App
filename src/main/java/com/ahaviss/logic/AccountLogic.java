@@ -115,7 +115,7 @@ public class AccountLogic {
             }
             //Asks for the account password
             String tempAccountPassword = ProjectUtils.getValidPassword("Enter the account holder's password: ");
-            String accountPassword = SecurityUtils.hashPassword(tempAccountPassword, SecurityUtils.generateSalt());
+            String accountPassword = SecurityUtils.hashPassword(tempAccountPassword);
             //Generates a random account ID
             int accountId = random.nextInt(9999999 - 1000000 + 1) + 1000000;
             //Makes sure that the ID is not already taken
@@ -192,7 +192,7 @@ public class AccountLogic {
     public static Account editPassword (Account account) {
         while (true) {
             try {
-                String currentPassword = null;
+                String currentPassword;
                 boolean passwordValidated = false;
                 for (int i = 0; i < 3; i++) {
                     //Asks the user for the current password and validates it
@@ -212,9 +212,9 @@ public class AccountLogic {
                 }
                 //Asks the user for the new password, validates it and sets it
                 String tempPassword = ProjectUtils.getValidPassword("Enter the new password: ");
-                String password = SecurityUtils.hashPassword(tempPassword, SecurityUtils.generateSalt());
+                String password = SecurityUtils.hashPassword(tempPassword);
                 account.setAccountPassword(password);
-                LogManager.addLog(Action.CHANGE_PASSWORD, User.USER, String.format("%d (%s)", account.getAccountId(), account.getAccountHolder()), null, currentPassword, tempPassword);
+                LogManager.addLog(Action.CHANGE_PASSWORD, User.USER, String.format("%d (%s)", account.getAccountId(), account.getAccountHolder()), null, "[REDACTED]", "[REDACTED]");
                 return account;
                 //Catch invalid input
             } catch (Exception e) {
@@ -224,12 +224,11 @@ public class AccountLogic {
     }
     public static void editPasswordAdmin (Account account, Admin admin) {
         try {
-            String oldPassword = account.getAccountPassword();
             String tempNewPassword = ProjectUtils.getValidPassword("Please enter the new account password: ");
-            String newPassword = SecurityUtils.hashPassword(tempNewPassword, SecurityUtils.generateSalt());
+            String newPassword = SecurityUtils.hashPassword(tempNewPassword);
             account.setAccountPassword(newPassword);
             if (admin != null) {
-                LogManager.addLog(Action.CHANGE_PASSWORD, User.ADMIN, String.format("%d (%s)", admin.getAdminId(), admin.getAdminName()), String.format("%d (%s)", account.getAccountId(), account.getAccountHolder()), oldPassword, newPassword);
+                LogManager.addLog(Action.CHANGE_PASSWORD, User.ADMIN, String.format("%d (%s)", admin.getAdminId(), admin.getAdminName()), String.format("%d (%s)", account.getAccountId(), account.getAccountHolder()), "[REDACTED]", "[REDACTED]");
             }
         } catch (Exception e) {
             System.out.printf("An unexpected error occurred: %s%n", e.getMessage());

@@ -73,5 +73,7 @@ To change the owner password:
 * * a) Data is now saved in HashMaps instead of Arraylists, allowing for regular O(1) lookup times
 * * b) Files are saved in Maven resource folders, and added backup files in case main files are deleted.
 * Added unit tests with JUnit.
+* MAJOR: Replaced basic SHA-256 hashing with Argon2id hashing.
+* Fixed repetitive code in SaveData.java and the database package
 
 *Developed by Ahaviss - 2026*

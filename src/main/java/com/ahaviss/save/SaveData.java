@@ -84,65 +84,25 @@ public class SaveData {
         if (list == null) return new HashMap<>();
         return list;
     }
+    private static void saveSpecificData (Object obj, File primary, File backup, String dataType) {
+        try {
+            String password = Session.getMasterPassword();
+            // Step 1: Convert list to JSON string
+            String jsonString = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(obj);
+            // Step 2: Encrypt that string
+            String encrypted = SecurityUtils.encrypt(jsonString, password);
+            // Step 3: Write the encrypted string to the file
+            Files.writeString(primary.toPath(), encrypted);
+            Files.writeString(backup.toPath(), encrypted);
+        }
+        catch (Exception e) {System.out.println("Error saving " + dataType +" data: " + e.getMessage());}
+    }
     //Saves all data
     public static void saveData(Map<Integer, Admin> admins, Map<Integer, Account> accounts, Owner owner, ArrayList<Log> logs) {
-        File file1 = new File(ADMINS_FILE);
-        File file2 = new File(OWNER_FILE);
-        File file3 = new File(ACCOUNTS_FILE);
-        File file4 = new File(AUDIT_FILE);
-        File backupFile1 = new File(BACKUP_ADMINS_FILE);
-        File backupFile2 = new File(BACKUP_OWNER_FILE);
-        File backupFile3 = new File(BACKUP_ACCOUNTS_FILE);
-        File backupFile4 = new File(BACKUP_AUDIT_FILE);
-        String password = Session.getMasterPassword();
-        try {
-            // Step 1: Convert list to JSON string (same as before, just not to file yet)
-            String jsonString = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(admins);
-            // Step 2: Encrypt that string
-            String encrypted = SecurityUtils.encrypt(jsonString, password);
-            // Step 3: Write the encrypted string to the file
-            Files.writeString(file1.toPath(), encrypted);
-            Files.writeString(backupFile1.toPath(), encrypted);
-        }
-        catch (Exception e) {
-            System.out.println("Error saving admin data: " +  e.getMessage());
-        }
-        try {
-            // Step 1: Convert list to JSON string (same as before, just not to file yet)
-            String jsonString = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(owner);
-            // Step 2: Encrypt that string
-            String encrypted = SecurityUtils.encrypt(jsonString, password);
-            // Step 3: Write the encrypted string to the file
-            Files.writeString(file2.toPath(), encrypted);
-            Files.writeString(backupFile2.toPath(), encrypted);
-        }
-        catch (Exception e) {
-            System.out.println("Error saving owner data: " + e.getMessage());
-        }
-        try {
-            // Step 1: Convert list to JSON string (same as before, just not to file yet)
-            String jsonString = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(accounts);
-            // Step 2: Encrypt that string
-            String encrypted = SecurityUtils.encrypt(jsonString, password);
-            // Step 3: Write the encrypted string to the file
-            Files.writeString(file3.toPath(), encrypted);
-            Files.writeString(backupFile3.toPath(), encrypted);
-        }
-        catch (Exception e) {
-            System.out.println("Error saving accounts data: " + e.getMessage());
-        }
-        try {
-            // Step 1: Convert list to JSON string (same as before, just not to file yet)
-            String jsonString = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(logs);
-            // Step 2: Encrypt that string
-            String encrypted = SecurityUtils.encrypt(jsonString, password);
-            // Step 3: Write the encrypted string to the file
-            Files.writeString(file4.toPath(), encrypted);
-            Files.writeString(backupFile4.toPath(), encrypted);
-        }
-        catch (Exception e) {
-            System.out.println("Error saving audit data: " + e.getMessage());
-        }
+        saveSpecificData(admins, new File(ADMINS_FILE), new File(BACKUP_ADMINS_FILE), "admins");
+        saveSpecificData(owner, new File(OWNER_FILE), new File(BACKUP_OWNER_FILE), "owner");
+        saveSpecificData(accounts, new File(ACCOUNTS_FILE), new File(BACKUP_ACCOUNTS_FILE), "accounts");
+        saveSpecificData(logs, new File(AUDIT_FILE), new File(BACKUP_AUDIT_FILE), "owner");
     }
     //To delete logs file
     public static void clearLogs () {

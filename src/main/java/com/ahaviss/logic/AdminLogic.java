@@ -52,7 +52,7 @@ public class AdminLogic {
     public static void editPassword (Admin admin) {
         //Gets a valid password, sets it to the admin and returns it
         String tempNewPassword = ProjectUtils.getValidPassword("Enter the new password: ");
-        String newPassword = SecurityUtils.hashPassword(tempNewPassword, SecurityUtils.generateSalt());
+        String newPassword = SecurityUtils.hashPassword(tempNewPassword);
         admin.setAdminPassword(newPassword);
     }
     public static void editAdminName (Admin admin) {
@@ -74,7 +74,7 @@ public class AdminLogic {
             //Gets the admin's name and password
             String adminName = ProjectUtils.getValidString("Enter admin name:");
             String tempAdminPassword = ProjectUtils.getValidPassword("Enter admin password:");
-            String adminPassword = SecurityUtils.hashPassword(tempAdminPassword, SecurityUtils.generateSalt());
+            String adminPassword = SecurityUtils.hashPassword(tempAdminPassword);
             //Generates a random admin ID
             int adminId = random.nextInt(9999999 - 1000000 + 1) + 1000000;
             //Checks if the ID is already taken

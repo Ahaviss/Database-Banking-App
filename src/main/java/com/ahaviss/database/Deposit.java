@@ -3,7 +3,7 @@ package com.ahaviss.database;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
-public class Deposit {
+public class Deposit implements Printable{
     //Private fields
     private final double amountDeposited;
     private final int accountId;
@@ -14,6 +14,7 @@ public class Deposit {
         this.accountId = accountId;
     }
     //Prints the deposit information
+    @Override
     public void printInfo () {
         System.out.println("Account ID: " + accountId);
         System.out.println("Amount Deposited: " + amountDeposited);

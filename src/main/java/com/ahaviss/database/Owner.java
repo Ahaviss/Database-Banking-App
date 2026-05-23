@@ -8,11 +8,11 @@ public class Owner {
     private String password;
     public Owner () {
         username = "tempUsername@123";
-        password = SecurityUtils.hashPassword("tempPassword@123", SecurityUtils.generateSalt());
+        password = SecurityUtils.hashPassword("tempPassword@123");
         Session.setMasterPassword("tempPassword@123");
     }
     public void setPassword (String password) {this.password = password;}
-    public void setPasswordFromUser (String password) {Session.setMasterPassword(password); this.password = SecurityUtils.hashPassword(password, SecurityUtils.generateSalt());}
+    public void setPasswordFromUser (String password) {Session.setMasterPassword(password); this.password = SecurityUtils.hashPassword(password);}
     public String getPassword () {return password;}
     public String getUsername() {return username;}
     public void setUsername(String username) {this.username = username;}

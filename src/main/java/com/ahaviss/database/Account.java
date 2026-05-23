@@ -8,7 +8,7 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import java.time.LocalDateTime;
 import java.util.List;
 
-public class Account{
+public class Account implements Printable {
     //Private fields
     private LocalDateTime accountLockedTime;
     private int amountOfTimesLocked;
@@ -66,6 +66,7 @@ public class Account{
         transfers.forEach(Transfer::printInfo);
     }
     //Prints the account information
+    @Override
     public void printInfo() {
         System.out.println("Account ID: " + accountId);
         System.out.println("Account Holder: " + accountHolder);
