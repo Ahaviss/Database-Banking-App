@@ -1,3 +1,4 @@
+
 package com.ahaviss.logs.enums;
 
 public enum User {
