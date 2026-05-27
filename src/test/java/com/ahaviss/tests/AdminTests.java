@@ -64,6 +64,7 @@ class AdminTests {
     void testLoggingIn () {
         try (MockedStatic<SecurityUtils> mockedStatic = mockStatic(SecurityUtils.class)) {
             mockedStatic.when(() -> SecurityUtils.verifyPassword("123Password", sharedHash)).thenReturn(true);
+            mockedStatic.when(() -> SecurityUtils.hashPassword("tempPassword@123")).thenReturn(sharedHash);
             String simulatedInput = "5555555\n123Password\n";
             final Map<Integer, Admin> admins = new HashMap<>();
             admins.put(5555555, admin);
