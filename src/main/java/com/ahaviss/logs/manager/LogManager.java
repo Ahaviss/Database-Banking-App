@@ -66,6 +66,6 @@ public class LogManager {
         try {
             logs.clear();
         }
-        finally {SaveData.locks.readLock().unlock();}
+        finally {SaveData.locks.writeLock().unlock();}
     }
 }

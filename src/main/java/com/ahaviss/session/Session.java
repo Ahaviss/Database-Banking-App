@@ -45,7 +45,7 @@ public class Session {
     }
     public static void stopAutoSaver() {rawAutoSaver.stop();}
     public static boolean isAutoSaverRunning() {
-        return autoSaver.isAlive() && autoSaver != null && rawAutoSaver.getRunning();
+        return autoSaver != null && autoSaver.isAlive() && rawAutoSaver.getRunning();
     }
     public static void changeSaveDuration (long milliseconds) {rawAutoSaver.setMilliseconds(milliseconds);}
     public static String getMasterPassword () {return masterPassword;}
