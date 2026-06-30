@@ -1,4 +1,5 @@
 # Banking App - Ahaviss
+## Database Version
 
 A comprehensive Command Line Interface (CLI) banking system designed with a focus on **Defensive Programming** and **Object-Oriented Design**. This project simulates a professional financial environment with tiered access and secure transaction logic.
 
@@ -35,6 +36,7 @@ This project serves as a practical application of advanced Java concepts:
 
 ### Prerequisites
 * **Java Development Kit (JDK) 21** (recommended for compatibility).
+* **MySQL** installation.
 * An IDE such as **IntelliJ IDEA**.
 
 ### How to Run
@@ -43,6 +45,7 @@ Because the project uses a multi-package structure, running it via an IDE is the
 1. Clone the repository or download the source code.
 2. Open the project folder in **IntelliJ IDEA**.
 3. Navigate to the `Main.java` file and click **Run**.
+4. Input your MySQL credentials that you made when you installed MySQL (default username is "root").
 
 #### How to Change Owner Password
 To change the owner password:
@@ -55,26 +58,7 @@ To change the owner password:
 
 ## Updates
 
-* MAJOR: Added File I/O and saving data.
-* MAJOR: Added basic SHA-256 password hashing.
-* Added a killswitch in owner panel.
-* Data is now saved with shutdown hooks.
-* Removed hardcoded owner password and username.
-* Added custom exceptions instead of magic numbers.
-* MAJOR: Added audit logs for the owner and is saved using File I/O.
-* Added control flow to avoid System.exit(0).
-* MAJOR: Added time-based account lockouts instead of permanent lockouts
-* MAJOR:
-* * a) Moved build tool to Maven.
-* * b) Using JSON via Jackson to save data instead of serialization
-* * c) Hashing passwords now includes a salt.
-* * d) JSON is encrypted with AES-256.
-* MAJOR:
-* * a) Data is now saved in HashMaps instead of Arraylists, allowing for regular O(1) lookup times
-* * b) Files are saved in Maven resource folders, and added backup files in case main files are deleted.
-* Added unit tests with JUnit.
-* MAJOR: Replaced basic SHA-256 hashing with Argon2id hashing.
-* Fixed repetitive code in SaveData.java and the database package.
-* Using Mockito inside tests to avoid 1-2 sec hashing delay for Argon2id.
+* MAJOR: Cloned banking-app and made it fully DB.
 
+### View the JSON (Original) version of this project 
 *Developed by Ahaviss - 2026*

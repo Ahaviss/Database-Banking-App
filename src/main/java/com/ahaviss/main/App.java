@@ -8,67 +8,173 @@
 
 package com.ahaviss.main;
 
-import com.ahaviss.database.Account;
 import com.ahaviss.enums.ControlFlow;
 import com.ahaviss.enums.LoginEnums;
 import com.ahaviss.logic.AccountLogic;
+import com.ahaviss.logic.AdminLogic;
+import com.ahaviss.logic.LoginSystem;
 import com.ahaviss.logic.Logins;
 import com.ahaviss.logs.manager.LogManager;
 import com.ahaviss.menus.AccountMenus;
 import com.ahaviss.menus.AdminMenus;
-import com.ahaviss.save.SaveData;
+import com.ahaviss.menus.GeneralMenus;
+import com.ahaviss.menus.OwnerMenus;
 import com.ahaviss.session.Session;
 import com.ahaviss.utilities.ProjectUtils;
+import com.ahaviss.utilities.SQLExecutor;
+import com.ahaviss.utilities.SecurityUtils;
+import net.sf.jsqlparser.JSQLParserException;
 
-import javax.crypto.AEADBadTagException;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.util.List;
 
 class App {
     private final ProjectUtils projectUtils;
     private final AccountLogic accountLogic;
     private final AccountMenus accountMenus;
+    private final GeneralMenus generalMenus;
+    private final OwnerMenus ownerMenus;
+    private final LoginSystem loginSystem;
+    private final LogManager logManager;
+    private final AdminLogic adminLogic;
     private final AdminMenus adminMenus;
     private final Logins logins;
-    App (ProjectUtils projectUtils, AccountLogic accountLogic, AccountMenus accountMenus, AdminMenus adminMenus, Logins logins) {
-        this.projectUtils = projectUtils;
-        this.accountLogic = accountLogic;
-        this.accountMenus = accountMenus;
-        this.adminMenus = adminMenus;
-        this.logins = logins;
+    private final SQLExecutor executor;
+    App () {
+        BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
+        this.executor = loadExecutor(reader);
+        this.projectUtils = new ProjectUtils(reader, executor);
+        this.accountLogic = new AccountLogic(projectUtils, executor);
+        this.accountMenus = new AccountMenus(accountLogic, projectUtils, executor);
+        this.adminLogic = new AdminLogic(projectUtils, executor);
+        this.logManager = new LogManager(projectUtils, executor);
+        this.generalMenus = new GeneralMenus(projectUtils, logManager);
+        this.loginSystem = new LoginSystem(projectUtils, executor);
+        this.ownerMenus = new OwnerMenus(projectUtils, adminLogic, generalMenus, executor);
+        this.adminMenus = new AdminMenus(accountLogic, projectUtils, accountMenus);
+        this.logins = new Logins(loginSystem, projectUtils, executor, accountLogic);
     }
-    void loadData () {
-        Session.setKillswitch(true);
-        String password = projectUtils.getValidString("Password:");
-        //Loads data
-        try {
-            Session.setAccounts(SaveData.loadAccountData(password));
-            Session.setAdmins(SaveData.loadAdminData(password));
-            Session.setOwner(SaveData.loadOwnerData(password));
-            LogManager.loadLogs(SaveData.loadAuditData(password));
+    private SQLExecutor loadExecutor (BufferedReader br) {
+        String url = "jdbc:mysql://localhost:3306/banking_app?createDatabaseIfNotExists=true";
+        while (true) {
+            try {
+                System.out.println("Input MySQL Credentials.");
+                System.out.println("Username:");
+                String username = br.readLine();
+                System.out.println("Password:");
+                String password = br.readLine();
+                initSchema(url, username, password);
+                return new SQLExecutor(url, username, password);
+            } catch (Exception e) {
+                System.out.println("Error: " + e.getMessage());
+            }
         }
-        catch (AEADBadTagException e) {
-            System.out.println("Critical Error: Cause: Key mismatched or files corrupted/tampered");
-            Session.setKillswitch(true);
+    }
+    private void initSchema(String url, String username, String password) {
+        try (Connection conn = DriverManager.getConnection(url, username, password);
+             Statement stmt = conn.createStatement()) {
+            stmt.execute("""
+            CREATE TABLE IF NOT EXISTS accounts (
+                account_id        INT PRIMARY KEY,
+                account_holder    VARCHAR(100) NOT NULL,
+                balance           DECIMAL(15, 2) NOT NULL DEFAULT 0.00,
+                account_password  VARCHAR(255) NOT NULL,
+                account_status    ENUM('ACTIVE', 'LOCKED') NOT NULL DEFAULT 'ACTIVE',
+                credit_score      INT NOT NULL CHECK (credit_score BETWEEN 500 AND 800),
+                locked_time       DATETIME NULL,
+                times_locked      INT NOT NULL DEFAULT 0,
+                duration_locked   INT NOT NULL DEFAULT 0
+            )
+        """);
+            stmt.execute("""
+            CREATE TABLE IF NOT EXISTS admins (
+                                admin_id        INT PRIMARY KEY,
+                                admin_name      VARCHAR(100) NOT NULL,
+                                admin_password  VARCHAR(255) NOT NULL
+                            )
+            """);
+            stmt.execute("""
+            CREATE TABLE IF NOT EXISTS owner (
+                                id              INT PRIMARY KEY DEFAULT 1,
+                                username        VARCHAR(100) NOT NULL,
+                                owner_password  VARCHAR(255) NOT NULL,
+                                CHECK (id = 1)
+                            )
+            """);
+            stmt.execute("""
+            CREATE TABLE IF NOT EXISTS deposits (
+                                account_id   INT NOT NULL,
+                                amount       DECIMAL(15, 2) NOT NULL,
+                                FOREIGN KEY (account_id) REFERENCES accounts(account_id) ON DELETE CASCADE
+                            )
+            """);
+            stmt.execute("""
+            CREATE TABLE IF NOT EXISTS withdrawals (
+                                account_id     INT NOT NULL,
+                                amount         DECIMAL(15, 2) NOT NULL,
+                                FOREIGN KEY (account_id) REFERENCES accounts(account_id) ON DELETE CASCADE
+                            )
+            """);
+            stmt.execute("""
+            CREATE TABLE IF NOT EXISTS transfers (
+                                source_account_id  INT NOT NULL,
+                                target_account_id  INT NOT NULL,
+                                amount  DECIMAL(15, 2) NOT NULL,
+                                FOREIGN KEY (source_account_id) REFERENCES accounts(account_id),
+                                FOREIGN KEY (target_account_id) REFERENCES accounts(account_id)
+                            )
+            """);
+            stmt.execute("""
+            CREATE TABLE IF NOT EXISTS audit_logs (
+                                action        VARCHAR(50) NOT NULL,
+                                performed_by  ENUM('ADMIN', 'USER') NOT NULL,
+                                source        VARCHAR(100) NOT NULL,
+                                target        VARCHAR(100) NULL DEFAULT 'N/A',
+                                before_value  VARCHAR(255) NULL DEFAULT 'N/A',
+                                after_value   VARCHAR(255) NULL DEFAULT 'N/A',
+                                timestamp     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+                            )
+            """);
+        } catch (SQLException e) {
+            System.err.println("Critical Error: " + e.getMessage());
             System.exit(1);
         }
-        catch (Exception e) {
-            System.out.println("Fatal Error: Cause: " + e.getMessage());
-            e.printStackTrace();
-            Session.setKillswitch(true);
-            System.exit(1);
+    }
+    private void initOwner() throws SQLException, JSQLParserException {
+        boolean ownerExists = !executor
+                .executeSQL("SELECT id FROM owner", null)
+                .getFirst().isEmpty();
+
+        if (!ownerExists) {
+            String defaultPassword = SecurityUtils.hashPassword("tempPassword@123");
+            executor.executeSQL(
+                    "INSERT INTO owner (id, username, owner_password) VALUES (1, ?, ?)",
+                    List.of(List.of("tempUsername@123", defaultPassword))
+            );
+            System.out.println("Default owner created. Username: tempUsername@123 | Password: tempPassword@123");
+            System.out.println("IMPORTANT: Change these credentials immediately.");
         }
-        Session.setKillswitch(false);
     }
     void start () {
-        loadData();
         preStartTasks();
         menu();
     }
-    void menu () {
+    private void menu () {
         while (true) {
             try {
                 //If the role is admin or owner, call the adminPanel method
                 if (Session.getRole() == LoginEnums.ADMIN || Session.getRole() == LoginEnums.OWNER) {
                     ControlFlow controlFlow = adminMenus.adminPanel();
+                    if (controlFlow == ControlFlow.OWNER_PANEL) {
+                        ControlFlow controlFlow1 = ownerMenus.ownerPanel();
+                        if (controlFlow1 == ControlFlow.QUIT) return;
+                        continue;
+                    }
                     if (controlFlow == ControlFlow.QUIT) return;
                     else continue;
                     //If the role is user, call the accountPanel method
@@ -95,9 +201,7 @@ class App {
                     }
                 } else if (answer.equalsIgnoreCase("create")) {
                     //Calls the createAccount method
-                    Account account = accountLogic.createOneAccount(Session.getAccounts());
-                    //Stores the account in the accounts list
-                    Session.getAccounts().put(account.getAccountId(), account);
+                    accountLogic.createOneAccount();
                 } else if (answer.equalsIgnoreCase("quit")) {
                     System.out.println("Terminating program...");
                     //Ends the program
@@ -112,25 +216,33 @@ class App {
             catch (NumberFormatException e) {
                 System.out.println("Invalid input. Please enter a valid number.");
             }
+            catch (SQLException e) {
+                System.out.println("DB/SQL error: " + e.getMessage());
+            }
+            catch (JSQLParserException e) {
+                System.out.println("Invalid SQL statement: " + e.getMessage());
+            }
             catch (Exception e) {
                 System.out.printf("An unexpected error occurred: %s%n", e.getMessage());
             }
         }
     }
-    void preStartTasks () {
-        //Adds a shutdown hook to save data
+    private void preStartTasks () {
         Runtime runtime = Runtime.getRuntime();
         runtime.addShutdownHook(new Thread(() -> {
-            if (Session.getKillswitch()) return;
-            SaveData.saveData(Session.getAdmins(), Session.getAccounts(), Session.getOwner(), LogManager.getLogs());
             projectUtils.closeReader();
+            executor.close();
         }));
-        Session.startAutoSaver();
+        try {
+            initOwner();
+        } catch (Exception e) {
+            System.err.println("Critical Error: Failed to initialize owner: " + e.getMessage());
+            System.exit(1);
+        }
         int version = Runtime.version().feature();
         System.out.println("Version: JDK " + version);
         if (version < 21) {
             System.out.println("WARNING: This code is recommended for JDK 21 and above.");
         }
-
     }
 }

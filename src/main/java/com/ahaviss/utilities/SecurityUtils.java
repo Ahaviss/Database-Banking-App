@@ -99,7 +99,7 @@ public class SecurityUtils {
      *
      * @param base64Package is the ciphertext packaged with a salt, IV (Initialization Vector), and ciphertext
      * @param password is the key inputted by user, and an AES key is derived from it using PBKDF2
-     * @return A plain JSON String for Jackson to turn into an Object or Map
+     * @return A plain String
      * @throws AEADBadTagException if password is incorrect, or data is corrupted or tampered with
      * @throws Exception if any other operation fails
      * */

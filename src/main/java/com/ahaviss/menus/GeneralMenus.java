@@ -9,24 +9,41 @@
 package com.ahaviss.menus;
 
 import com.ahaviss.logs.manager.LogManager;
-import com.ahaviss.save.SaveData;
-import com.ahaviss.session.Session;
 import com.ahaviss.utilities.ProjectUtils;
+
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 
 public class GeneralMenus {
     private final ProjectUtils projectUtils;
-    public GeneralMenus (ProjectUtils projectUtils) {this.projectUtils = projectUtils;}
+    private final LogManager logManager;
+    public GeneralMenus (ProjectUtils projectUtils, LogManager logManager) {
+        this.projectUtils = projectUtils;
+        this.logManager = logManager;
+    }
     public void manageLogs () {
         while (true) {
             try {
-                String option = projectUtils.getValidString("Print logs, Clear all logs, Quit managing.");
-                if (option.equalsIgnoreCase("print logs")) {
+                String option = projectUtils.getValidString("Print all logs, Print recent logs, Print logs within timeframe, Clear all logs, Quit managing.");
+                if (option.equalsIgnoreCase("print all logs")) {
                     //Prints logs
-                    LogManager.printLogs();
+                    logManager.printAllLogs();
+                } else if (option.equalsIgnoreCase("print recent logs")) {
+                    logManager.printRecentLogs(projectUtils.getValidInt("Limit:"));
                 } else if (option.equalsIgnoreCase("clear all logs")) {
-                    //Clears current arraylist and deletes file
-                    LogManager.clearLogs();
-                    SaveData.clearLogs();
+                    //Clears from database
+                    logManager.clearLogs();
+                } else if (option.equalsIgnoreCase("print logs within timeframe")) {
+                    try {
+                        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+                        LocalDateTime start = LocalDateTime.parse(projectUtils.getValidString("Start (24H): (yyyy-MM-dd HH:mm:ss) e.g. 2026-06-29 09:30:00"), formatter);
+                        LocalDateTime end = LocalDateTime.parse(projectUtils.getValidString("End (24H): (yyyy-MM-dd HH:mm:ss) e.g. 2026-06-29 14:00:00"), formatter);
+                        logManager.printAllLogsWithinTimeFrame(start, end);
+                    }
+                    catch (DateTimeParseException e) {
+                        System.out.println("Invalid time format: " + e.getMessage());
+                    }
                 } else if (option.equalsIgnoreCase("quit managing")) {
                     return;
                     //Invalid input
@@ -36,31 +53,6 @@ public class GeneralMenus {
             }
             catch (Exception e) {
                 System.out.printf("An unexpected error occurred: %s%n", e.getMessage());
-            }
-        }
-    }
-    public void manageAutoSaver () {
-        while (true) {
-            String option = projectUtils.getValidString("Change Autosave Duration, Stop Autosaver, Start Autosaver, Force Start Autosaver, Quit Managing");
-            switch (option.toLowerCase()) {
-                case "change autosave duration":
-                    long duration = projectUtils.getValidLong("New autosave duration (sec):");
-                    Session.changeSaveDuration(duration * 1000);
-                    break;
-                case "stop autosaver":
-                    Session.stopAutoSaver();
-                    break;
-                case "start autosaver":
-                    if (Session.isAutoSaverRunning()) System.out.println("Autosaver is already running");
-                    else Session.restartAutoSaver();
-                    break;
-                case "force start autosaver":
-                    Session.restartAutoSaver();
-                    break;
-                case "quit managing":
-                    return;
-                default:
-                    System.out.println("Invalid option. Please try again.");
             }
         }
     }

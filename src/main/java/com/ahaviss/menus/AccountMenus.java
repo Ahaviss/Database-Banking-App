@@ -9,18 +9,29 @@
 package com.ahaviss.menus;
 
 import com.ahaviss.database.Account;
-import com.ahaviss.database.Admin;
+import com.ahaviss.enums.AccountStatus;
 import com.ahaviss.enums.ControlFlow;
 import com.ahaviss.enums.LoginEnums;
 import com.ahaviss.logic.AccountLogic;
 import com.ahaviss.session.Session;
 import com.ahaviss.utilities.ProjectUtils;
+import com.ahaviss.utilities.SQLExecutor;
+
+import java.math.BigDecimal;
+import java.sql.SQLException;
+import java.util.List;
+import java.util.Map;
 
 public class AccountMenus {
     private final AccountLogic accountLogic;
     private final ProjectUtils projectUtils;
-    public AccountMenus(AccountLogic accountLogic, ProjectUtils projectUtils) {this.accountLogic = accountLogic; this.projectUtils = projectUtils;}
-    public ControlFlow accountPanel () {
+    private final SQLExecutor executor;
+    public AccountMenus(AccountLogic accountLogic, ProjectUtils projectUtils, SQLExecutor executor) {
+        this.accountLogic = accountLogic; 
+        this.projectUtils = projectUtils;
+        this.executor = executor;
+    }
+    public ControlFlow accountPanel () throws Exception {
         while (true) {
             //Account holder options
             System.out.println("Account Panel");
@@ -28,7 +39,15 @@ public class AccountMenus {
             switch (option.toLowerCase()) {
                 case "view account info":
                     //Print account information
-                    Session.getCurrentAccount().printInfo();
+                    int id = Session.getCurrentAccount();
+                    Map<String, Object> info = executor.executeSQL("SELECT * from accounts WHERE account_id = ?", List.of(List.of(id))).getFirst().getFirst();
+                    String accountHolder = info.get("account_holder").toString();
+                    double balance = projectUtils.verifyInstanceOf(info.get("balance"), BigDecimal.class, () -> new SQLException("Incorrect return type given from database")).doubleValue();
+                    String password = info.get("account_password").toString();
+                    String status = info.get("account_status").toString();
+                    int creditScore = projectUtils.verifyInstanceOf(info.get("credit_score"), Integer.class, () -> new SQLException("Incorrect return type given from database"));
+                    Account account = new Account(Session.getCurrentAccount(), accountHolder, balance, password, status.equalsIgnoreCase("active") ? AccountStatus.ACTIVE : AccountStatus.LOCKED, creditScore);
+                    account.printInfo();
                     break;
                 case "deposit":
                     //Call deposit method
@@ -40,32 +59,31 @@ public class AccountMenus {
                     break;
                 case "transfer":
                     //Call transfer method
-                    accountLogic.transfer(Session.getAccounts(), Session.getCurrentAccount());
+                    accountLogic.transfer(Session.getCurrentAccount());
                     break;
                 case "view balance":
                     //Get user balance
-                    System.out.println("$" + Session.getCurrentAccount().getBalance());
+                    System.out.println("$" + executor.executeSQL("SELECT balance FROM accounts WHERE account_id = ?", List.of(List.of(Session.getCurrentAccount()))).getFirst().getFirst().get("balance").toString());
                     break;
                 case "view history":
                     //Print account logs
-                    Session.getCurrentAccount().printHistory();
+                    printHistory(executor.executeSQL("""
+                        SELECT * FROM withdrawals WHERE account_id = ?;
+                        SELECT * FROM deposits WHERE account_id = ?;
+                        SELECT * FROM transfers WHERE source_account_id = ?;
+                        SELECT * from transfers WHERE target_account_id = ?;
+                    """, List.of(List.of(Session.getCurrentAccount()), List.of(Session.getCurrentAccount()), List.of(Session.getCurrentAccount()), List.of(Session.getCurrentAccount()))));
                     break;
                 case "logout":
                     //Logs out the user
                     System.out.println("Logging out...");
                     //Sets user role to none
                     Session.setRole(LoginEnums.NONE);
-                    Session.setCurrentAccount(null);
+                    Session.setCurrentAccount(-1);
                     return ControlFlow.MAIN_MENU;
                 case "change password":
                     //Call edit method
-                    Account newAcc = accountLogic.editPassword(Session.getCurrentAccount());
-                    if (newAcc != null) {
-                        //Check if the account isn't null
-                        Session.setCurrentAccount(newAcc);
-                    } else {
-                        continue;
-                    }
+                    accountLogic.editPassword(Session.getCurrentAccount());
                     break;
                 case "quit program":
                     System.out.println("Terminating program...");
@@ -77,16 +95,54 @@ public class AccountMenus {
             }
         }
     }
-    public void editAccount () {
+    private void printHistory(List<List<Map<String, Object>>> history) {
+        System.out.println("History:");
+        System.out.println("Withdrawals:");
+        List<Map<String, Object>> withdrawals = history.getFirst();
+        if (withdrawals.isEmpty()) System.out.println("Empty.");
+        else withdrawals.forEach(map -> {
+            System.out.println("    Account ID: " + map.get("account_id"));
+            System.out.println("    Amount Withdrew: " + map.get("amount"));
+            System.out.println();
+        });
+        System.out.println("Deposits:");
+        List<Map<String, Object>> deposits = history.get(1);
+        if (deposits.isEmpty()) System.out.println("Empty.");
+        else deposits.forEach(map -> {
+            System.out.println("    Account ID: " + map.get("account_id"));
+            System.out.println("    Amount Deposited: " + map.get("amount"));
+            System.out.println();
+        });
+        System.out.println("Incoming Transfers:");
+        List<Map<String, Object>> incomingTransfers = history.get(3);
+        if (incomingTransfers.isEmpty()) System.out.println("Empty.");
+        else incomingTransfers.forEach(map -> {
+            System.out.println("    Source Account ID: " + map.get("source_account_id"));
+            System.out.println("    Target Account ID: " + map.get("target_account_id"));
+            System.out.println("    Amount Transferred: " + map.get("amount"));
+            System.out.println();
+        });
+        System.out.println("Outgoing Transfers:");
+        List<Map<String, Object>> outgoingTransfers = history.get(2);
+        if (outgoingTransfers.isEmpty()) System.out.println("Empty.");
+        else outgoingTransfers.forEach(map -> {
+            System.out.println("    Source Account ID: " + map.get("source_account_id"));
+            System.out.println("    Target Account ID: " + map.get("target_account_id"));
+            System.out.println("    Amount Transferred: " + map.get("amount"));
+            System.out.println();
+        });
+    }
+    public void editAccount () throws Exception {
         //Checks if the accounts list is empty
-        if (!ProjectUtils.checkMap(Session.getAccounts())) {
+        if (!projectUtils.tableHasContents(Account.class)) {
             System.out.println("No accounts available. Please create an account.");
             return;
         }
+        int amountOfAccounts = projectUtils.sizeOfTable(Account.class);
         //Gets the number of accounts to edit
-        int amountOfAccountToEdit = projectUtils.getValidInt(String.format("Enter the amount of the accounts you want to edit (%d total accounts): ", Session.getAccounts().size()));
+        int amountOfAccountToEdit = projectUtils.getValidInt(String.format("Enter the amount of the accounts you want to edit (%d total accounts): ", amountOfAccounts));
         //Gets a valid input
-        if (amountOfAccountToEdit > Session.getAccounts().size()) {
+        if (amountOfAccountToEdit > amountOfAccounts) {
             System.out.println("Invalid input. Please enter a number less than or equal to the number of accounts.");
             return;
         } else if (amountOfAccountToEdit == 0) {
@@ -96,16 +152,15 @@ public class AccountMenus {
         for (int i = 0; i < amountOfAccountToEdit; i++) {
             while (true) {
                 //Gets the ID of the account to edit
-                int accountId = projectUtils.getValidInt("Enter the ID of the account you want to edit: ");
-                Account account = Session.getAccounts().get(accountId);
+                int account = projectUtils.getValidInt("Enter the ID of the account you want to edit: ");
                 //Checks if account is found
-                if (account == null) {
-                    System.out.printf("Account ID %d not found.%n", accountId);
+                if (!projectUtils.idExists(account, Account.class)) {
+                    System.out.printf("Account ID %d not found.%n", account);
                     continue;
                 }
                 while (true) {
                     //Account editing options
-                    Admin admin = null;
+                    int admin = 0;
                     if (Session.getRole() == LoginEnums.ADMIN) {
                         admin = Session.getCurrentAdmin();
                     }

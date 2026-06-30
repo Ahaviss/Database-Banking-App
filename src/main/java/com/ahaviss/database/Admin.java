@@ -8,17 +8,13 @@
 
 package com.ahaviss.database;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.annotation.JsonCreator;
-
 public class Admin implements Printable{
     //Private fields
     private final int adminId;
     private String adminName;
     private String adminPassword;
     //Constructor for object creation
-    @JsonCreator
-    public Admin(@JsonProperty("adminId") int adminId, @JsonProperty("adminName") String adminName, @JsonProperty("adminPassword") String adminPassword) {
+    public Admin(int adminId, String adminName, String adminPassword) {
         this.adminId = adminId;
         this.adminName = adminName;
         this.adminPassword = adminPassword;

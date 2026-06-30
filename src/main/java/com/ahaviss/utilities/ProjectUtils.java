@@ -8,21 +8,27 @@
 
 package com.ahaviss.utilities;
 //Java imports
-import java.util.ArrayList;
+import net.sf.jsqlparser.JSQLParserException;
+
+import java.sql.SQLException;
 import java.io.BufferedReader;
 import java.io.IOException;
-import java.util.Map;
+import java.util.List;
 
 public class ProjectUtils {
     private final BufferedReader br;
-    public ProjectUtils (BufferedReader br) {this.br = br;}
+    private final SQLExecutor executor;
+    public ProjectUtils (BufferedReader br, SQLExecutor executor) {
+        this.br = br;
+        this.executor = executor;
+    }
     public int getValidInt (String prompt) {
         while (true) {
             try {
                 //Prints the given prompt
                 System.out.println(prompt);
                 String tempInput = br.readLine().trim();
-                if (tempInput == null || tempInput.isBlank()) {
+                if (tempInput.isBlank()) {
                     System.out.println("Invalid input. Please enter a non-empty number.");
                     continue;
                 }
@@ -44,13 +50,41 @@ public class ProjectUtils {
             }
         }
     }
+    public boolean idExists (int id, Class<?> clazz) throws SQLException, JSQLParserException {
+        return switch (clazz.getSimpleName()) {
+            case "Account" -> !executor.executeSQL("SELECT account_id FROM accounts WHERE account_id = ?", List.of(List.of(id))).getFirst().isEmpty();
+            case "Admin" -> !executor.executeSQL("SELECT admin_id FROM admins WHERE admin_id = ?", List.of(List.of(id))).getFirst().isEmpty();
+            default -> false;
+        };
+    }
+    public int sizeOfTable (Class<?> clazz) throws Exception {
+        return switch (clazz.getSimpleName()) {
+            case "Account" -> verifyInstanceOf(executor.executeSQL("SELECT COUNT(*) AS number_of_accounts FROM accounts", null).getFirst().getFirst().get("number_of_accounts"), Long.class, () -> new SQLException("Incorrect return type given from database.")).intValue();
+            case "Admin" -> verifyInstanceOf(executor.executeSQL("SELECT COUNT(*) AS number_of_admins FROM admins", null).getFirst().getFirst().get("number_of_admins"), Long.class, () -> new SQLException("Incorrect return type given from database")).intValue();
+            default -> -1;
+        };
+    }
+    public boolean tableHasContents (Class<?> clazz) throws SQLException, JSQLParserException {
+        return switch (clazz.getSimpleName()) {
+            case "Account" -> !executor.executeSQL("SELECT account_id FROM accounts LIMIT 1", null).getFirst().isEmpty();
+            case "Admin" -> !executor.executeSQL("SELECT admin_id FROM admins LIMIT 1", null).getFirst().isEmpty();
+            case "Log" -> !executor.executeSQL("SELECT action FROM audit_logs LIMIT 1", null).getFirst().isEmpty();
+            default -> false;
+        };
+    }
+    public <T> T verifyInstanceOf (Object obj, Class<T> returnType, ExceptionSupplier<? extends Exception> exception) throws Exception{
+        if (returnType != null && returnType.isInstance(obj)) {
+            return returnType.cast(obj);
+        }
+        else {throw exception.getException();}
+    }
     public long getValidLong (String prompt) {
         while (true) {
             try {
                 //Prints the given prompt
                 System.out.println(prompt);
                 String tempInput = br.readLine().trim();
-                if (tempInput == null || tempInput.isBlank()) {
+                if (tempInput.isBlank()) {
                     System.out.println("Invalid input. Please enter a non-empty number.");
                     continue;
                 }
@@ -91,7 +125,7 @@ public class ProjectUtils {
                 System.out.println(prompt);
                 String input = br.readLine().trim();
                 //Checks if the input is empty
-                if (input == null || input.isBlank()) {
+                if (input.isBlank()) {
                     System.out.println("Invalid input. Please enter a non-empty sentence/word.");
                     continue;
                 }
@@ -105,13 +139,39 @@ public class ProjectUtils {
             }
         }
     }
+    public String getValidUsername (String prompt, int cap) {
+        while (true) {
+            try {
+                //Prints the given prompt
+                System.out.println(prompt);
+                System.out.println("Max of " + cap + " characters.");
+                String input = br.readLine().trim();
+                //Checks if the input is empty
+                if (input.isBlank()) {
+                    System.out.println("Invalid input. Please enter a non-empty sentence/word.");
+                    continue;
+                }
+                if (input.length() > cap) {
+                    System.out.println("Number of characters exceeds maximum. Please try again.");
+                    continue;
+                }
+                //Returns the input
+                return input;
+                //Catch invalid input
+            } catch (IOException e) {
+                System.out.println("Invalid input: " + e.getMessage());
+            } catch (Exception e) {
+                System.out.printf("An unexpected error occurred: %s%n", e.getMessage());
+            }
+        }
+    }
     public double getValidDouble (String prompt) {
         while (true) {
             try {
                 //Prints the given prompt
                 System.out.println(prompt);
                 String tempInput = br.readLine().trim();
-                if (tempInput == null || tempInput.isBlank()) {
+                if (tempInput.isBlank()) {
                     System.out.println("Invalid input. Please enter a non-empty number.");
                     continue;
                 }
@@ -137,10 +197,7 @@ public class ProjectUtils {
     public String getValidPassword (String prompt) {
         while (true) {
             try {
-                //Prints the given prompt
-                System.out.println(prompt);
-                //Tells the user the password requirements
-                String password = getValidString("Password must be 8 characters long and contain at least one uppercase letter,\none lowercase letter and one number");
+                String password = getValidString(prompt + "\nPassword must be 8 characters long and less than 255 characters and contain at least one uppercase letter,\none lowercase letter and one number");
                 //Checks the password length
                 if (password.length() < 8) {
                     System.out.println("Invalid password. Password must be 8 characters long.");
@@ -188,7 +245,4 @@ public class ProjectUtils {
             System.out.println("Error closing reader: " + e.getMessage());
         }
     }
-    //Generic method to check if an arraylist is empty
-    public static <T> boolean checkArrayList (ArrayList<T> arrayList) {return !arrayList.isEmpty();}
-    public static <T> boolean checkMap (Map<Integer, T> map) {return !map.isEmpty();}
 }

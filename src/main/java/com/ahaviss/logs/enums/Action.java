@@ -33,4 +33,12 @@ public enum Action{
     public String getAction() {
         return action;
     }
+    public static Action fromValue(String value) {
+        for (Action action : Action.values()) {
+            if (action.getAction().equalsIgnoreCase(value)) {
+                return action;
+            }
+        }
+        throw new IllegalArgumentException("Unknown value: " + value);
+    }
 }

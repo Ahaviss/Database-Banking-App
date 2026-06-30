@@ -9,8 +9,6 @@
 package com.ahaviss.tests;
 
 import com.ahaviss.database.Account;
-import com.ahaviss.database.Admin;
-import com.ahaviss.enums.AccountStatus;
 import com.ahaviss.exceptions.AccountLockedException;
 import com.ahaviss.logic.AccountLogic;
 import com.ahaviss.logic.LoginSystem;
@@ -21,52 +19,60 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
-import java.util.HashMap;
+
+import java.math.BigDecimal;
+import java.util.List;
 import java.util.Map;
 import org.mockito.*;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
+import static com.ahaviss.testutilities.TestUtils.executor;
+import static com.ahaviss.testutilities.TestUtils.exception;
 @ExtendWith(MockitoExtension.class)
 @Timeout(5)
 class AccountTests {
-    private Account account;
     private static String sharedHash;
+    private ProjectUtils projectUtils;
     @BeforeAll
     @SuppressWarnings({"unused", "EmptyTryBlock"})
-    static void beforeAll() {
+    static void beforeAll() throws Exception {
         //To connect Mockito before tests
         try (var ignored = Mockito.mockStatic(SecurityUtils.class)) {}
         sharedHash = SecurityUtils.hashPassword("123Password");
         Class<?> warmup = AdminInputTests.class;
     }
     @BeforeEach
-    void setUp() {
-        account = new Account(5555555, "John", 100, sharedHash, AccountStatus.ACTIVE, 800);
+    void setUp() throws Exception {
+        executor().executeSQL("INSERT INTO accounts (account_id, account_holder, balance, account_password, credit_score) VALUES (?, ?, ?, ?, ?)", List.of(List.of(5555555, "John", 100, sharedHash, 800)));
     }
     @AfterEach
-    void tearDown() {
-        account = null;
+    void tearDown() throws Exception {
+        executor().executeSQL("SET REFERENTIAL_INTEGRITY FALSE", null);
+        executor().executeSQL("TRUNCATE TABLE accounts", null);
+        executor().executeSQL("SET REFERENTIAL_INTEGRITY TRUE", null);
+        projectUtils = null;
     }
-    private AccountLogic mockAccountLogic (ProjectUtils projectUtils) {
-        return new AccountLogic(projectUtils);
+    private AccountLogic createAccountLogic(ProjectUtils projectUtils) {
+        return new AccountLogic(projectUtils, executor());
     }
     @Nested
     class UserInputTests {
         @Test
         @DisplayName("Test Account Creation")
-        void testAccountCreation() {
+        void testAccountCreation() throws Exception {
             try (MockedStatic<SecurityUtils> mockedStatic = mockStatic(SecurityUtils.class)) {
                 mockedStatic.when(() -> SecurityUtils.hashPassword("123Password")).thenReturn(sharedHash);
                 mockedStatic.when(() -> SecurityUtils.verifyPassword("123Password", sharedHash)).thenReturn(true);
+                Map<String, Object> info = executor().executeSQL("SELECT * FROM accounts WHERE account_id = 5555555", null).getFirst().getFirst();
                 assertAll(
-                        () -> assertEquals(5555555, account.getAccountId()),
-                        () -> assertEquals("John", account.getAccountHolder()),
-                        () -> assertEquals(100, account.getBalance()),
-                        () -> assertTrue(SecurityUtils.verifyPassword("123Password", account.getAccountPassword())),
-                        () -> assertEquals(AccountStatus.ACTIVE, account.getAccountStatus()),
-                        () -> assertEquals(800, account.getCreditScore())
+                        () -> assertEquals(5555555, TestUtils.mockInput("").verifyInstanceOf(info.get("account_id"), Integer.class, exception())),
+                        () -> assertEquals("John", info.get("account_holder").toString()),
+                        () -> assertEquals(100, TestUtils.mockInput("").verifyInstanceOf(info.get("balance"), BigDecimal.class, exception()).doubleValue()),
+                        () -> assertTrue(SecurityUtils.verifyPassword("123Password", info.get("account_password").toString())),
+                        () -> assertEquals("ACTIVE", info.get("account_status").toString()),
+                        () -> assertEquals(800, TestUtils.mockInput("").verifyInstanceOf(info.get("credit_score"), Integer.class, exception()))
                 );
             }
         }
@@ -76,9 +82,7 @@ class AccountTests {
             try (MockedStatic<SecurityUtils> mockedStatic = mockStatic(SecurityUtils.class)) {
                 mockedStatic.when(() -> SecurityUtils.verifyPassword("123Password", sharedHash)).thenReturn(true);
                 String simulatedInput = "5555555\n123Password";
-                Map<Integer, Account> map = new HashMap<>();
-                map.put(5555555, account);
-                assertDoesNotThrow(() -> new LoginSystem(TestUtils.mockInput(simulatedInput)).accountLogin(map));
+                assertDoesNotThrow(() -> new LoginSystem(TestUtils.mockInput(simulatedInput), executor()).accountLogin());
             }
         }
         @ParameterizedTest
@@ -89,10 +93,12 @@ class AccountTests {
                 "-2, 2"
         })
         @DisplayName("Test Deposits")
-        void testDeposits(int transferAmountInvalid, int transferAmountValid) {
+        void testDeposits(int transferAmountInvalid, int transferAmountValid) throws Exception {
             String simulatedInput = String.format("%s\n%s\nn\n", transferAmountInvalid, transferAmountValid);
-            mockAccountLogic(TestUtils.mockInput(simulatedInput)).deposit(account);
-            assertEquals(100 + transferAmountValid, account.getBalance(), "Negative check failed");
+            projectUtils = TestUtils.mockInput(simulatedInput);
+            createAccountLogic(projectUtils).deposit(5555555);
+            double balance = projectUtils.verifyInstanceOf(executor().executeSQL("SELECT balance FROM accounts WHERE account_id = 5555555", null).getFirst().getFirst().get("balance"), BigDecimal.class, exception()).doubleValue();
+            assertEquals(100 + transferAmountValid, balance, "Negative check failed");
         }
 
         @Test
@@ -103,9 +109,7 @@ class AccountTests {
                 mockedStatic.when(() -> SecurityUtils.verifyPassword("1", sharedHash)).thenReturn(false);
                 String simulatedInput = "5555555\n1\n5555555\n1\n5555555\n1\n";
                 assertThrows(AccountLockedException.class, () -> {
-                    Map<Integer, Account> list = new HashMap<>();
-                    list.put(account.getAccountId(), account);
-                    new LoginSystem(TestUtils.mockInput(simulatedInput)).accountLogin(list);
+                    new LoginSystem(TestUtils.mockInput(simulatedInput), executor()).accountLogin();
                 }, "Lockout reliability test failed");
             }
         }
@@ -113,28 +117,29 @@ class AccountTests {
         @ParameterizedTest
         @ValueSource(ints = {500, 100, 50, 1000})
         @DisplayName("Test Transfers")
-        void testTransfers(int transferAmount) {
-            Account account2 = new Account(5555556, "John", 100, sharedHash, AccountStatus.ACTIVE, 800);
-            Map<Integer, Account> accounts = new HashMap<>();
-            accounts.put(account.getAccountId(), account);
-            accounts.put(account2.getAccountId(), account2);
+        void testTransfers(int transferAmount) throws Exception {
+            executor().executeSQL("INSERT INTO accounts (account_id, account_holder, balance, account_password, credit_score) VALUES (?, ?, ?, ?, ?)", List.of(List.of(5555556, "John", 100, sharedHash, 800)));
             String simulatedInput;
             if (transferAmount <= 100)
                 simulatedInput = String.format("5555555\n%s\nn\n", transferAmount);
             else
                 simulatedInput = String.format("5555555\n%s\n", transferAmount);
-
-            mockAccountLogic(TestUtils.mockInput(simulatedInput)).transfer(accounts, account2);
-            assertEquals(100 - (transferAmount <= 100 ? transferAmount : 0), account2.getBalance(), "Source account balance is incorrect");
-            assertEquals(100 + (transferAmount <= 100 ? transferAmount : 0), account.getBalance(), "Recipient account balance is incorrect");
+            projectUtils = TestUtils.mockInput(simulatedInput);
+            createAccountLogic(projectUtils).transfer(5555556);
+            double source = projectUtils.verifyInstanceOf(executor().executeSQL("SELECT balance FROM accounts WHERE account_id = 5555556", null).getFirst().getFirst().get("balance"), BigDecimal.class, exception()).doubleValue();
+            double recipient = projectUtils.verifyInstanceOf(executor().executeSQL("SELECT balance FROM accounts WHERE account_id = 5555555", null).getFirst().getFirst().get("balance"), BigDecimal.class, exception()).doubleValue();
+            assertEquals(100 - (transferAmount <= 100 ? transferAmount : 0), source, "Source account balance is incorrect");
+            assertEquals(100 + (transferAmount <= 100 ? transferAmount : 0), recipient, "Recipient account balance is incorrect");
         }
         @ParameterizedTest
         @ValueSource(ints = {100, 50, 10, 5})
         @DisplayName("Test Withdraws")
-        void testWithdraws(int withdrawAmount) {
+        void testWithdraws(int withdrawAmount) throws Exception{
             String simulatedInput = String.format("%s\nn", withdrawAmount);
-            mockAccountLogic(TestUtils.mockInput(simulatedInput)).withdraw(account);
-            assertEquals((100 - withdrawAmount), account.getBalance(), "Withdraw test failed");
+            projectUtils = TestUtils.mockInput(simulatedInput);
+            createAccountLogic(TestUtils.mockInput(simulatedInput)).withdraw(5555555);
+            double balance = projectUtils.verifyInstanceOf(executor().executeSQL("SELECT balance FROM accounts WHERE account_id = 5555555", null).getFirst().getFirst().get("balance"), BigDecimal.class, exception()).doubleValue();
+            assertEquals((100 - withdrawAmount), balance, "Withdraw test failed");
         }
         @ParameterizedTest
         @CsvSource({
@@ -144,7 +149,7 @@ class AccountTests {
                 "stopTrying, 12GetMeIn, 123Password, NewPassword123"
         })
         @DisplayName("Test User Changing Password")
-        void testUserChangingPassword (String incorrectPassword1, String incorrectPassword2, String correctPassword, String passwordToHash) {
+        void testUserChangingPassword (String incorrectPassword1, String incorrectPassword2, String correctPassword, String passwordToHash) throws Exception {
             try (MockedStatic<SecurityUtils> mockedStatic = mockStatic(SecurityUtils.class)) {
                 mockedStatic.when(() -> SecurityUtils.verifyPassword(anyString(), eq(sharedHash))).thenAnswer(arg -> {
                     String password = arg.getArgument(0);
@@ -153,14 +158,24 @@ class AccountTests {
                 });
                 mockedStatic.when(() -> SecurityUtils.hashPassword(passwordToHash)).thenReturn("mocked_hash");
                 String simulatedInput = String.format("%s\n%s\n%s\n%s", incorrectPassword1, incorrectPassword2, correctPassword, passwordToHash);
-                mockAccountLogic(TestUtils.mockInput(simulatedInput)).editPassword(account);
-                assertEquals("mocked_hash", account.getAccountPassword(), "Incorrect password change.");
+                createAccountLogic(TestUtils.mockInput(simulatedInput)).editPassword(5555555);
+                String password = executor().executeSQL("SELECT account_password FROM accounts WHERE account_id = 5555555", null).getFirst().getFirst().get("account_password").toString();
+                assertEquals("mocked_hash", password, "Incorrect account password change.");
             }
         }
     }
     @Nested
     class AdminInputTests {
-        private static final Admin admin = new Admin(5555555, "ahaviss", sharedHash);
+        @BeforeEach
+        void setUp () throws Exception {
+            executor().executeSQL("INSERT INTO admins (admin_id, admin_name, admin_password) VALUES (?, ?, ?)", List.of(List.of(5555555, "ahaviss", sharedHash)));
+        }
+        @AfterEach
+        void tearDown () throws Exception {
+            executor().executeSQL("SET REFERENTIAL_INTEGRITY FALSE", null);
+            executor().executeSQL("TRUNCATE TABLE admins", null);
+            executor().executeSQL("SET REFERENTIAL_INTEGRITY TRUE", null);
+        }
         @ParameterizedTest
         @CsvSource({
                 "1, 123Passwordd",
@@ -169,34 +184,35 @@ class AccountTests {
                 "12Pass, 1001SecurePassword"
         })
         @DisplayName("Test Changing Password")
-        void testChangingPassword(String newPasswordInvalid, String newPasswordValid) {
+        void testChangingPassword(String newPasswordInvalid, String newPasswordValid) throws Exception{
             try (MockedStatic<SecurityUtils> mockedStatic = mockStatic(SecurityUtils.class)) {
                 mockedStatic.when(() -> SecurityUtils.hashPassword(newPasswordValid))
                         .thenReturn("completely_mocked_hash");
                 mockedStatic.when(() -> SecurityUtils.verifyPassword(newPasswordValid, "completely_mocked_hash"))
                         .thenReturn(true);
                 String simulatedInput = String.format("%s\n%s\n", newPasswordInvalid, newPasswordValid);
-                mockAccountLogic(TestUtils.mockInput(simulatedInput)).editPasswordAdmin(account, admin);
-                assertTrue(SecurityUtils.verifyPassword(newPasswordValid, account.getAccountPassword()), "Incorrect password change.");
+                createAccountLogic(TestUtils.mockInput(simulatedInput)).editPasswordAdmin(5555555, 5555555);
+                String password = executor().executeSQL("SELECT account_password FROM accounts WHERE account_id = 5555555", null).getFirst().getFirst().get("account_password").toString();
+                assertTrue(SecurityUtils.verifyPassword(newPasswordValid, password), "Incorrect account password change.");
             }
         }
         @ParameterizedTest
         @ValueSource(ints = {5555555, 1000000, 3434343, 9999999})
         @DisplayName("Test Deleting Accounts")
-        void testDeletingAccounts(int accountId) {
-            final Map<Integer, Account> accounts = new HashMap<>();
-            String hashedPassword = sharedHash;
-            accounts.put(accountId, new Account (accountId, "John", 100, hashedPassword, AccountStatus.ACTIVE, 800));
+        void testDeletingAccounts(int accountId) throws Exception {
+            executor().executeSQL("REPLACE INTO accounts (account_id, account_holder, balance, account_password, credit_score) VALUES (?, ?, ?, ?, ?)", List.of(List.of(accountId, "John", 100, sharedHash, 800)));
             String simulatedInput = String.format("1\n%s\n", accountId);
-            mockAccountLogic(TestUtils.mockInput(simulatedInput)).deleteAccounts(accounts, admin);
-            assertNull(accounts.get(accountId));
+            projectUtils = TestUtils.mockInput(simulatedInput);
+            createAccountLogic(projectUtils).deleteAccounts(5555555);
+            assertFalse(projectUtils.idExists(accountId, Account.class));
         }
         @ParameterizedTest
         @ValueSource(ints = {0, 1, 2, 3, 4})
         @DisplayName("Test Locking Accounts")
-        void testLockingAccounts (int amountOfTimesLocked) {
-            account.setAmountOfTimesLocked(amountOfTimesLocked);
-            AccountLogic.lockAccount(account);
+        void testLockingAccounts (int amountOfTimesLocked) throws Exception {
+            executor().executeSQL("UPDATE accounts SET times_locked = ? WHERE account_id = 5555555", List.of(List.of(amountOfTimesLocked)));
+            projectUtils = TestUtils.mockInput("");
+            createAccountLogic(projectUtils).lockAccount(5555555);
             int expected;
             if (amountOfTimesLocked == 0)
                 expected = 30;
@@ -208,7 +224,8 @@ class AccountTests {
                 expected = Integer.MAX_VALUE;
             else
                 expected = Integer.MIN_VALUE;
-            assertEquals(expected, account.getDurationLocked());
+            int duration = projectUtils.verifyInstanceOf(executor().executeSQL("SELECT duration_locked FROM accounts WHERE account_id = 5555555", null).getFirst().getFirst().get("duration_locked"), Integer.class, exception());
+            assertEquals(expected, duration);
         }
         @ParameterizedTest
         @CsvSource({
@@ -218,10 +235,11 @@ class AccountTests {
                 "'', Robert"
         })
         @DisplayName("Test Changing Account Holder")
-        void testChangingAccountHolder (String accountHolderInvalid, String accountHolderValid) {
+        void testChangingAccountHolder (String accountHolderInvalid, String accountHolderValid) throws Exception {
             String simulatedInput = String.format("%s\n%s\n", accountHolderInvalid, accountHolderValid);
-            mockAccountLogic(TestUtils.mockInput(simulatedInput)).editAccountHolder(account, admin);
-            assertEquals(accountHolderValid, account.getAccountHolder());
+            createAccountLogic(TestUtils.mockInput(simulatedInput)).editAccountHolder(5555555, 5555555);
+            String accountHolder = executor().executeSQL("SELECT account_holder FROM accounts WHERE account_id = 5555555", null).getFirst().getFirst().get("account_holder").toString();
+            assertEquals(accountHolderValid, accountHolder, "Incorrect account holder change");
         }
         @ParameterizedTest
         @CsvSource ({
@@ -231,10 +249,14 @@ class AccountTests {
                 "109, 10029, 750"
         })
         @DisplayName("Test Changing Credit Score")
-        void testChangingCreditScore (int invalidCreditScore1, int invalidCreditScore2, int validCreditScore) {
+        void testChangingCreditScore (int invalidCreditScore1, int invalidCreditScore2, int validCreditScore) throws Exception {
             String simulatedInput = String.format("%s\n%s\n%s", invalidCreditScore1, invalidCreditScore2, validCreditScore);
-            mockAccountLogic(TestUtils.mockInput(simulatedInput)).editCreditScore(account, admin);
-            assertEquals(validCreditScore, account.getCreditScore());
+            projectUtils = TestUtils.mockInput(simulatedInput);
+            createAccountLogic(projectUtils).editCreditScore(5555555, 5555555);
+            int creditScore = projectUtils.verifyInstanceOf(executor().executeSQL("SELECT credit_score FROM accounts WHERE account_id = 5555555", null).getFirst().getFirst().get("credit_score"), Integer.class, exception());
+            assertEquals(validCreditScore, creditScore);
         }
     }
+    @AfterAll
+    static void afterAll() {executor().close();}
 }

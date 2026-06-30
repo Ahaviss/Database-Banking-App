@@ -8,60 +8,20 @@
 
 package com.ahaviss.session;
 
-import com.ahaviss.database.Account;
-import com.ahaviss.database.Admin;
-import com.ahaviss.database.Owner;
 import com.ahaviss.enums.LoginEnums;
-import com.ahaviss.save.AutoSaver;
 
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 public class Session {
-    private static volatile AutoSaver rawAutoSaver = new AutoSaver();
-    private static volatile Thread autoSaver = new Thread(rawAutoSaver);
-    //Password
-    private static volatile String masterPassword;
-    //Owner's credentials'
-    private static volatile Owner owner = new Owner();
     //Current account index
-    private static Account currentAccount;
-    private static Admin currentAdmin;
+    private static int currentAccount = -1;
+    private static int currentAdmin = -1;
     //Current role
     private static LoginEnums role = LoginEnums.NONE;
-    //Account and admin lists
-    private static Map<Integer, Account> accounts = new ConcurrentHashMap<>();
-    private static Map<Integer, Admin> admins = new ConcurrentHashMap<>();
-    //Killswitch boolean
-    private static volatile boolean killswitch = false;
-    public static void startAutoSaver() {
-        autoSaver.setDaemon(true);
-        autoSaver.start();
-    }
-    public static void restartAutoSaver () {
-        rawAutoSaver = new AutoSaver();
-        autoSaver = new Thread(rawAutoSaver);
-        startAutoSaver();
-    }
-    public static void stopAutoSaver() {rawAutoSaver.stop();}
-    public static boolean isAutoSaverRunning() {
-        return autoSaver != null && autoSaver.isAlive() && rawAutoSaver.getRunning();
-    }
-    public static void changeSaveDuration (long milliseconds) {rawAutoSaver.setMilliseconds(milliseconds);}
-    public static String getMasterPassword () {return masterPassword;}
-    public static void setMasterPassword (String masterPassword) {Session.masterPassword = masterPassword;}
-    public static Owner getOwner () {return owner;}
-    public static void setOwner (Owner owner) {Session.owner = owner;}
-    public static Account getCurrentAccount () {return currentAccount;}
-    public static void setCurrentAccount (Account account) {currentAccount = account;}
-    public static Admin getCurrentAdmin () {return currentAdmin;}
-    public static void setCurrentAdmin (Admin admin) {currentAdmin = admin;}
+    //Getters and setters
+    public static int getCurrentAccount () {return currentAccount;}
+    public static void setCurrentAccount (int account) {currentAccount = account;}
+    public static int getCurrentAdmin () {return currentAdmin;}
+    public static void setCurrentAdmin (int admin) {currentAdmin = admin;}
     public static LoginEnums getRole () {return role;}
     public static void setRole (LoginEnums role) {Session.role = role;}
-    public static Map<Integer, Account> getAccounts () {return accounts;}
-    public static void setAccounts (Map<Integer, Account> accounts) {Session.accounts = accounts;}
-    public static Map<Integer, Admin> getAdmins () {return admins;}
-    public static void setAdmins (Map<Integer, Admin> admins) {Session.admins = admins;}
-    public static boolean getKillswitch () {return killswitch;}
-    public static void setKillswitch (boolean killswitch) {Session.killswitch = killswitch;}
 }

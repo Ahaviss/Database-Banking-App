@@ -8,7 +8,6 @@
 
 package com.ahaviss.tests;
 import com.ahaviss.database.Admin;
-import com.ahaviss.database.Owner;
 import com.ahaviss.logic.AdminLogic;
 import com.ahaviss.logic.LoginSystem;
 import com.ahaviss.testutilities.TestUtils;
@@ -19,43 +18,60 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
-import java.util.HashMap;
+
+import java.util.List;
 import java.util.Map;
 import org.mockito.*;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import static com.ahaviss.testutilities.TestUtils.exception;
+import static com.ahaviss.testutilities.TestUtils.executor;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 @Timeout(5)
 class AdminTests {
-    private Admin admin;
     private static String sharedHash;
+    private ProjectUtils projectUtils;
     @BeforeAll
     @SuppressWarnings({"unused", "EmptyTryBlock"})
-    static void beforeAll() {
+    static void beforeAll() throws Exception{
         //To connect Mockito before tests
         try (var ignored = Mockito.mockStatic(SecurityUtils.class)) {}
         sharedHash = SecurityUtils.hashPassword("123Password");
         Class<?> warmup = AdminLogic.class;
+        initOwner();
+    }
+    static void initOwner() throws Exception {
+        executor().executeSQL(
+                "INSERT INTO owner (id, username, owner_password) VALUES (1, ?, ?)",
+                List.of(List.of("tempUsername@123", "fake_password"))
+        );
     }
     @BeforeEach
-    void beforeEach() {admin = new Admin(5555555, "John", sharedHash);}
+    void beforeEach() throws Exception {
+        executor().executeSQL("INSERT INTO admins (admin_id, admin_name, admin_password) VALUES (?, ?, ?)", List.of(List.of(5555555, "John", sharedHash)));
+    }
     @AfterEach
-    void afterEach() {admin = null;}
+    void afterEach() throws Exception {
+        executor().executeSQL("TRUNCATE TABLE admins", null);
+        projectUtils = null;
+    }
     private AdminLogic mockAdminLogic (ProjectUtils projectUtils) {
-        return new AdminLogic(projectUtils);
+        return new AdminLogic(projectUtils, executor());
     }
     @Test
     @DisplayName("Test Admin Creation")
-    void testAdminCreation() {
+    void testAdminCreation() throws Exception {
         try (MockedStatic<SecurityUtils> mockedStatic = mockStatic(SecurityUtils.class)) {
             mockedStatic.when(() -> SecurityUtils.hashPassword("123Password")).thenReturn(sharedHash);
             mockedStatic.when(() -> SecurityUtils.verifyPassword("123Password", sharedHash)).thenReturn(true);
+            Map<String, Object> info = executor().executeSQL("SELECT * FROM admins WHERE admin_id = 5555555", null).getFirst().getFirst();
+            projectUtils = TestUtils.mockInput("");
             assertAll(
-                    () -> assertEquals(5555555, admin.getAdminId()),
-                    () -> assertEquals("John", admin.getAdminName()),
-                    () -> assertTrue(SecurityUtils.verifyPassword("123Password", admin.getAdminPassword()))
+                    () -> assertEquals(5555555, projectUtils.verifyInstanceOf(info.get("admin_id"), Integer.class, exception())),
+                    () -> assertEquals("John", info.get("admin_name").toString()),
+                    () -> assertTrue(SecurityUtils.verifyPassword("123Password", info.get("admin_password").toString()))
             );
         }
     }
@@ -66,19 +82,18 @@ class AdminTests {
             mockedStatic.when(() -> SecurityUtils.verifyPassword("123Password", sharedHash)).thenReturn(true);
             mockedStatic.when(() -> SecurityUtils.hashPassword("tempPassword@123")).thenReturn(sharedHash);
             String simulatedInput = "5555555\n123Password\n";
-            final Map<Integer, Admin> admins = new HashMap<>();
-            admins.put(5555555, admin);
-            assertDoesNotThrow(() -> new LoginSystem(TestUtils.mockInput(simulatedInput)).adminLogin(admins, new Owner()));
+            assertDoesNotThrow(() -> new LoginSystem(TestUtils.mockInput(simulatedInput), executor()).adminLogin());
         }
     }
     @ParameterizedTest
     @ValueSource(ints = {1000000, 5000000, 1212121, 9999999})
     @DisplayName("Test Deleting Admins")
-    void testDeletingAdmins(int adminId) {
-        final Map<Integer, Admin> admins = new HashMap<>();
-        admins.put(adminId, new Admin(adminId, "John", sharedHash));
+    void testDeletingAdmins(int adminId) throws Exception {
+        executor().executeSQL("INSERT INTO admins (admin_id, admin_name, admin_password) VALUES (?, ?, ?)", List.of(List.of(adminId, "John", sharedHash)));
         String simulatedInput = String.format("1\n%s", adminId);
-        assertNull(mockAdminLogic(TestUtils.mockInput(simulatedInput)).deleteAdmins(admins).get(adminId));
+        projectUtils = TestUtils.mockInput(simulatedInput);
+        mockAdminLogic(projectUtils).deleteAdmins();
+        assertFalse(projectUtils.idExists(adminId, Admin.class));
     }
     @ParameterizedTest
     @CsvSource({
@@ -88,15 +103,19 @@ class AdminTests {
             "12Pass, 1001SecurePassword"
     })
     @DisplayName("Test Changing Password")
-    void testChangingPassword(String newPasswordInvalid, String newPasswordValid) {
+    void testChangingPassword(String newPasswordInvalid, String newPasswordValid) throws Exception {
         try (MockedStatic<SecurityUtils> mockedStatic = mockStatic(SecurityUtils.class)) {
             mockedStatic.when(() -> SecurityUtils.hashPassword(newPasswordValid))
                     .thenReturn("completely_mocked_hash");
-            mockedStatic.when(() -> SecurityUtils.verifyPassword(newPasswordValid, "completely_mocked_hash"))
+            mockedStatic.when(() -> SecurityUtils.verifyPassword(eq(newPasswordValid), eq("completely_mocked_hash")))
+                    .thenReturn(true);
+            mockedStatic.when(() -> SecurityUtils.verifyPassword(eq("completely_mocked_hash"), eq("completely_mocked_hash")))
                     .thenReturn(true);
             String simulatedInput = String.format("%s\n%s\n", newPasswordInvalid, newPasswordValid);
-            mockAdminLogic(TestUtils.mockInput(simulatedInput)).editPassword(admin);
-            assertTrue(SecurityUtils.verifyPassword(newPasswordValid, admin.getAdminPassword()), "Incorrect password change.");
+            mockAdminLogic(TestUtils.mockInput(simulatedInput)).editPassword(5555555);
+            String password = executor().executeSQL("SELECT admin_password FROM admins WHERE admin_id = 5555555", null).getFirst().getFirst().get("admin_password").toString();
+            System.out.println(password);
+            assertTrue(SecurityUtils.verifyPassword("completely_mocked_hash", password), "Incorrect password change.");
         }
     }
     @ParameterizedTest
@@ -107,9 +126,10 @@ class AdminTests {
             "'', Robert"
     })
     @DisplayName("Test Changing Admin Name")
-    void testChangingAdminName (String adminNameInvalid, String adminNameValid) {
+    void testChangingAdminName (String adminNameInvalid, String adminNameValid) throws Exception {
         String simulatedInput = String.format("%s\n%s\n", adminNameInvalid, adminNameValid);
-        mockAdminLogic(TestUtils.mockInput(simulatedInput)).editAdminName(admin);
-        assertEquals(adminNameValid, admin.getAdminName());
+        mockAdminLogic(TestUtils.mockInput(simulatedInput)).editAdminName(5555555);
+        String adminName = executor().executeSQL("SELECT admin_name FROM admins WHERE admin_id = 5555555", null).getFirst().getFirst().get("admin_name").toString();
+        assertEquals(adminNameValid, adminName);
     }
 }

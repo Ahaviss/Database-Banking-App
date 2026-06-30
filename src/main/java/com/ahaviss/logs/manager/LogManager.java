@@ -7,65 +7,69 @@
  */
 
 package com.ahaviss.logs.manager;
-import com.ahaviss.logs.enums.*;
 import com.ahaviss.logs.database.Log;
-import com.ahaviss.save.SaveData;
+import com.ahaviss.logs.enums.Action;
+import com.ahaviss.logs.enums.User;
 import com.ahaviss.utilities.ProjectUtils;
+import com.ahaviss.utilities.SQLExecutor;
+import net.sf.jsqlparser.JSQLParserException;
 
-import java.util.ArrayList;
+import java.sql.SQLException;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Map;
+
 public class LogManager {
-    //ArrayList to store logs
-    private static volatile ArrayList<Log> logs = new ArrayList<>();
-    //To add a log
-    public static void addLog (Action action, User user, String source, String destination, String before, String after) {
-        SaveData.locks.writeLock().lock();
-        try {
-            if (user == User.USER) {
-                logs.add(new Log(action, user, source, before, after));
-            } else {
-                logs.add(new Log(action, user, source, destination, before, after));
-            }
-        }
-        finally {SaveData.locks.writeLock().unlock();}
-    }
-    //To pull all logs
-    public static ArrayList<Log> getLogs() {
-        SaveData.locks.readLock().lock();
-        try {
-            return logs;
-        }
-        finally {SaveData.locks.readLock().unlock();}
-    }
-    //To pull all logs from file and load into JVM
-    public static void loadLogs (ArrayList<Log> logs) {
-        SaveData.locks.writeLock().lock();
-        try {
-            LogManager.logs = logs;
-        }
-        finally {SaveData.locks.writeLock().unlock();}
-    }
     //To print all logs
-    public static void printLogs () {
-        SaveData.locks.readLock().lock();
-        try {
-            if (!ProjectUtils.checkArrayList(logs)) {
-                System.out.println("Logs are empty.");
-                return;
-            }
-            System.out.println("---[AUDIT LOGS START]---");
-            for (Log log : logs) {
-                System.out.println(log);
-            }
-            System.out.println("---[AUDIT LOGS ENDS]---");
+    private final ProjectUtils projectUtils;
+    private final SQLExecutor executor;
+    public LogManager(ProjectUtils projectUtils, SQLExecutor executor) {
+        this.projectUtils = projectUtils;
+        this.executor = executor;
+    }
+    public void printAllLogs() throws Exception {
+        if (!projectUtils.tableHasContents(Log.class)) {
+            System.out.println("Logs are empty.");
+            return;
         }
-        finally {SaveData.locks.readLock().unlock();}
+        printCommonLogs(executor.executeSQL("SELECT * FROM audit_logs", null).getFirst());
+    }
+    public void printRecentLogs(int limit) throws Exception {
+        if (!projectUtils.tableHasContents(Log.class)) {
+            System.out.println("Logs are empty.");
+            return;
+        }
+        printCommonLogs(executor.executeSQL("SELECT * FROM audit_logs LIMIT ?", List.of(List.of(limit))).getFirst());
+    }
+    public void printAllLogsWithinTimeFrame(LocalDateTime start, LocalDateTime end) throws Exception {
+        if (!projectUtils.tableHasContents(Log.class)) {
+            System.out.println("Logs are empty.");
+            return;
+        }
+        printCommonLogs(executor.executeSQL("SELECT * FROM audit_logs WHERE timestamp BETWEEN ? AND ?", List.of(List.of(start, end))).getFirst());
+    }
+    private void printCommonLogs (List<Map<String, Object>> logs) throws Exception {
+        System.out.println("---[AUDIT LOGS START]---");
+        try {
+            logs.forEach(map -> {
+                LocalDateTime timestamp;
+                try {
+                    timestamp = projectUtils.verifyInstanceOf(map.get("timestamp"), LocalDateTime.class, () -> new SQLException("Incorrect return type given from database"));
+                } catch (Exception e) {throw new RuntimeException(e);}
+                Action action = Action.fromValue(map.get("action").toString());
+                User user = User.fromValue(map.get("performed_by").toString());
+                String source = map.get("source").toString();
+                String target = map.get("target").toString();
+                String beforeValue = map.get("before_value").toString();
+                String afterValue = map.get("after_value").toString();
+                Log log = new Log(timestamp, action, user, source, target, beforeValue, afterValue);
+                System.out.println(log);
+            });
+        } catch (RuntimeException e) {throw new Exception(e);}
+        System.out.println("---[AUDIT LOGS ENDS]---");
     }
     //To clear all logs
-    public static void clearLogs() {
-        SaveData.locks.writeLock().lock();
-        try {
-            logs.clear();
-        }
-        finally {SaveData.locks.writeLock().unlock();}
+    public void clearLogs() throws SQLException, JSQLParserException {
+        executor.executeSQL("TRUNCATE TABLE audit_logs", null);
     }
 }

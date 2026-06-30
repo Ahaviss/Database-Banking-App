@@ -8,8 +8,6 @@
 
 package com.ahaviss.database;
 import com.ahaviss.enums.TransferDirection;
-import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonProperty;
 
 public class Transfer implements Printable {
     //Private fields
@@ -18,8 +16,7 @@ public class Transfer implements Printable {
     private final int sourceAccountId;
     private final TransferDirection direction;
     //Constructor for object creation
-    @JsonCreator
-    public Transfer(@JsonProperty("amountTransferred") double amountTransferred, @JsonProperty("targetAccountId") int targetAccountId, @JsonProperty("sourceAccountId") int sourceAccountId, @JsonProperty("direction") TransferDirection direction) {
+    public Transfer(double amountTransferred, int targetAccountId, int sourceAccountId, TransferDirection direction) {
         this.amountTransferred = amountTransferred;
         this.targetAccountId = targetAccountId;
         this.sourceAccountId = sourceAccountId;

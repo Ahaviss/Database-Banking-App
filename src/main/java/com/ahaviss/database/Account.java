@@ -11,8 +11,6 @@ package com.ahaviss.database;
 import java.util.ArrayList;
 //Local imports
 import com.ahaviss.enums.AccountStatus;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.annotation.JsonCreator;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -32,8 +30,7 @@ public class Account implements Printable {
     private final List<Withdraw> withdraws = new ArrayList<>();
     private final List<Transfer> transfers = new ArrayList<>();
     //Constructor for object creation
-    @JsonCreator
-    public Account(@JsonProperty("accountId") int accountId, @JsonProperty("accountHolder") String accountHolder, @JsonProperty("balance") double balance, @JsonProperty("accountPassword") String accountPassword, @JsonProperty("accountStatus") AccountStatus accountStatus, @JsonProperty("creditScore") int creditScore) {
+    public Account(int accountId, String accountHolder, double balance, String accountPassword, AccountStatus accountStatus, int creditScore) {
         this.accountId = accountId;
         this.accountHolder = accountHolder;
         this.balance = balance;
