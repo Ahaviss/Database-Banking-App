@@ -60,5 +60,8 @@ To change the owner password:
 
 * MAJOR: Cloned banking-app and made it fully DB.
 
-### View the JSON (Original) version of this project 
+### View the JSON (Original) version of this project below
+
+[JSON Banking-App](https://github.com/Ahaviss/Banking-App)
+
 *Developed by Ahaviss - 2026*
